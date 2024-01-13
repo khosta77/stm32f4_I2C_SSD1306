@@ -114,7 +114,7 @@ main.hex: main.elf makefile objects.mk $(OPTIONAL_TOOL_DEPS)
 
 main.siz: main.elf makefile objects.mk $(OPTIONAL_TOOL_DEPS)
 	@echo 'Invoking: GNU Arm Cross Print Size'
-	arm-none-eabi-size --format=berkeley "main.elf"
+	arm-none-eabi-size --format=GNU "main.elf"
 	@echo 'Finished building: $@'
 	@echo ' '
 

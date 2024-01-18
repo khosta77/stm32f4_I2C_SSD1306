@@ -82,7 +82,52 @@ void I2C1_write(uint8_t address) {
 	I2C1->CR1 |= I2C_CR1_STOP;
 }
 
-uint8_t I2C1_Read(uint8_t reg_addr) {
+uint8_t I2C1_Read(const uint8_t reg_addr) {
+    uint8_t _data = 0x00;
+
+    // 0.  Ждем не занят ли шина I2C
+    while (I2C1->SR2 & I2C_SR2_BUSY);
+
+    // 1. Запускаем передачу
+	I2C1->CR1 |= I2C_CR1_START;
+	
+    // 2. Ждем пока будет отправлен начальный бит
+	while (!(I2C1->SR1 & I2C_SR1_SB));
+	
+    // 3. Отправляем в канал адрес, для того чтобы происходила запись данных \
+    //    его надо сместить в лево на 1 бит и оставить ноль первым битом
+	I2C1->DR = (BME280_ADDRESS << 1);
+    while (!(I2C1->SR1 & I2C_SR1_ADDR));
+    (void) I2C1->SR1;
+    (void) I2C1->SR2;
+
+    // 4. Передаем адрес регистра
+	I2C1->DR = reg_addr;
+	while(!(I2C1->SR1 & I2C_SR1_TXE)){};
+
+    // 5. Останавливаем передачу
+	I2C1->CR1 |= I2C_CR1_STOP;
+
+    // 6. Производим рестарт
+	I2C1->CR1 |= I2C_CR1_START;
+	while(!(I2C1->SR1 & I2C_SR1_SB)){};
+
+	// 7. Передаем адрес устройства, но теперь для чтения
+	I2C1->DR = ((BME280_ADDRESS << 1) | 0x01);
+	while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
+	(void) I2C1->SR1;
+	(void) I2C1->SR2;
+
+	// 8. Считываем данные
+	I2C1->CR1 &= ~I2C_CR1_ACK;
+	while(!(I2C1->SR1 & I2C_SR1_RXNE)){};
+	data = I2C1->DR;
+
+    // 9. Производим остановку
+	I2C1->CR1 |= I2C_CR1_STOP;
+
+	return data;
+#if 0
 	uint8_t data;
 	//стартуем
 	I2C1->CR1 |= I2C_CR1_START;
@@ -90,7 +135,6 @@ uint8_t I2C1_Read(uint8_t reg_addr) {
 	(void) I2C1->SR1;
 
 	//передаем адрес устройства
-	I2C1->DR = (BME280_ADDRESS << 1);
 	while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
 	(void) I2C1->SR1;
 	(void) I2C1->SR2;
@@ -118,6 +162,7 @@ uint8_t I2C1_Read(uint8_t reg_addr) {
 	I2C1->CR1 |= I2C_CR1_STOP;
 
 	return data;
+#endif
 }
 
 void GPIOD_init() {

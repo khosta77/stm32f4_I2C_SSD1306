@@ -1,6 +1,8 @@
 #include "../system/include/cmsis/stm32f4xx.h"
 
-#define BME280_ADDRESS 0b01110111
+#define BME280_ADDRESS 0b01110110
+
+#define BME280_ID 0xD0
 
 void I2C1_init() {
     // GPIO init
@@ -80,6 +82,44 @@ void I2C1_write(uint8_t address) {
 	I2C1->CR1 |= I2C_CR1_STOP;
 }
 
+uint8_t I2C1_Read(uint8_t reg_addr) {
+	uint8_t data;
+	//стартуем
+	I2C1->CR1 |= I2C_CR1_START;
+	while(!(I2C1->SR1 & I2C_SR1_SB)){};
+	(void) I2C1->SR1;
+
+	//передаем адрес устройства
+	I2C1->DR = (BME280_ADDRESS << 1);
+	while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
+	(void) I2C1->SR1;
+	(void) I2C1->SR2;
+
+	//передаем адрес регистра
+	I2C1->DR = reg_addr;
+	while(!(I2C1->SR1 & I2C_SR1_TXE)){};
+	I2C1->CR1 |= I2C_CR1_STOP;
+
+	//рестарт!!!
+	I2C1->CR1 |= I2C_CR1_START;
+	while(!(I2C1->SR1 & I2C_SR1_SB)){};
+	(void) I2C1->SR1;
+
+	//передаем адрес устройства, но теперь для чтения
+	I2C1->DR = ((BME280_ADDRESS << 1) | 0x01);
+	while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
+	(void) I2C1->SR1;
+	(void) I2C1->SR2;
+
+	//читаем
+	I2C1->CR1 &= ~I2C_CR1_ACK;
+	while(!(I2C1->SR1 & I2C_SR1_RXNE)){};
+	data = I2C1->DR;
+	I2C1->CR1 |= I2C_CR1_STOP;
+
+	return data;
+}
+
 void GPIOD_init() {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
     GPIOD->MODER |= GPIO_MODER_MODER12_0;
@@ -88,7 +128,11 @@ void GPIOD_init() {
 int main(void) {
     I2C1_init();
     GPIOD_init();
-    for (uint8_t i = 0; i < 128; i++) {
-        I2C1_write(i);
+    uint8_t id = 0;
+    while (1) {
+        id = I2C1_Read(BME280_ID);
     }
+    //for (uint8_t i = 0; i < 128; i++) {
+    //    I2C1_write(i);
+    //}
 }

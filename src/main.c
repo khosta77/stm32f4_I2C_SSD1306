@@ -4,6 +4,36 @@
 
 #define BME280_ID 0xD0
 
+uint8_t _i2c1_data_rx[16] = {0};
+uint8_t _i2c1_data_tx[16] = {0};
+uint8_t _i2c1_mrk_rx = 0x00;
+uint8_t _i2c1_mrk_rx_work = 0x00;
+uint8_t _i2c1_mrk_tx = 0x00;
+
+
+void DMA1_Stream6_IRQHandler(void) {  // TX
+    if ((DMA1->HISR & DMA_HISR_TCIF6) == DMA_HISR_TCIF6) {
+        //GPIOD->ODR ^= GPIO_ODR_OD12;
+
+        _i2c1_mrk_tx = 0x00;
+        DMA1_Stream6->CR &= ~DMA_SxCR_EN;
+        //while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
+        DMA1->HIFCR |= DMA_HIFCR_CTCIF6;
+        //GPIOD->ODR ^= GPIO_ODR_OD12;
+
+    }
+}
+
+void DMA1_Stream5_IRQHandler(void) {  // RX
+    if ((DMA1->HISR & DMA_HISR_TCIF5) == DMA_HISR_TCIF5) {
+        _i2c1_mrk_rx = 0x00;
+        _i2c1_mrk_rx_work = 0x01;
+        DMA1_Stream5->CR &= ~DMA_SxCR_EN;
+        //while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
+        DMA1->HIFCR |= DMA_HIFCR_CTCIF5;
+    }
+}
+
 void I2C1_init() {
     // GPIO init
     // PB6 I2C_SCL 
@@ -19,7 +49,7 @@ void I2C1_init() {
     // I2C init
     RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
     // 1. Устанавливает тактовую частоту периферийного устройства 50 MHz
-    I2C1->CR2 |= (I2C_CR2_FREQ_5 | I2C_CR2_FREQ_4 | I2C_CR2_FREQ_1);  // 0x2A;
+    I2C1->CR2 |= (I2C_CR2_LAST | I2C_CR2_DMAEN | (I2C_CR2_FREQ_5 | I2C_CR2_FREQ_4 | I2C_CR2_FREQ_1));
     
     // 2. Задаем частоту работы
     // Есть два режима стандартная и повышенная:
@@ -51,6 +81,139 @@ void I2C1_init() {
     I2C1->CR1 |= (I2C_CR1_PE);
 
     // https://hubstub.ru/stm32/184-stm32-i2c.html - помогло
+    
+    // Настройка DMA1 на чтение и запись по I2C
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+
+    // Отключаем DMA, для чтения
+    DMA1_Stream5->CR &= ~DMA_SxCR_EN;
+    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
+    // Настройка контрольных регистров
+    // - (0x01 << 25)     - настройка DMA канала, для I2C1_RX
+    // - DMA_SxCR_MINC    - Memory INCrement mode
+    // - периферия-память
+    // - DMA_SxCR_TCIE    - Прерывания по завершению передачи
+    DMA1_Stream5->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_TCIE);
+
+    DMA1->HIFCR |= DMA_HIFCR_CTCIF5;  // Включаем прерывание после успешной передачи передачи
+    DMA1_Stream5->PAR = (uint32_t)&I2C1->DR;
+    DMA1_Stream5->M0AR = (uint32_t)&_i2c1_data_rx[0];
+    NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+    NVIC_SetPriority(DMA1_Stream5_IRQn, 2);
+
+    // Отключаем DMA, для записи
+    DMA1_Stream6->CR &= ~DMA_SxCR_EN;
+    while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
+    // Настройка контрольных регистров
+    // - (0x01 << 25)     - настройка DMA канала, для I2C1_RX
+    // - DMA_SxCR_MINC    - Memory INCrement mode
+    // - DMA_SxCR_DIR_0   - память-перефирия
+    // - DMA_SxCR_TCIE    - Прерывания по завершению передачи
+    DMA1_Stream6->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_DIR_0 | DMA_SxCR_TCIE);
+
+    DMA1->HIFCR |= DMA_HIFCR_CTCIF6;  // Включаем прерывание после успешной передачи передачи
+    DMA1_Stream6->PAR = (uint32_t)&I2C1->DR;
+    DMA1_Stream6->M0AR = (uint32_t)&_i2c1_data_tx[0];
+    NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+    NVIC_SetPriority(DMA1_Stream6_IRQn, 3);
+
+}
+
+static void DMA_Transmit(const uint8_t *pBuffer, uint32_t size) {
+    if((NULL != pBuffer) && (size < 16)) {
+        while (_i2c1_mrk_tx != 0x00) {;}  // Ждем пока предыдущая передача не закончится
+        _i2c1_mrk_tx = 0x01;
+        DMA1_Stream6->CR &= ~DMA_SxCR_EN;
+        while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
+        for (uint8_t i = 0; i < size; ++i) {
+            _i2c1_data_tx[i] = pBuffer[i];
+        }
+
+        DMA1_Stream6->NDTR = size;
+        DMA1->HIFCR = (DMA_HIFCR_CDMEIF6 | DMA_HIFCR_CTEIF6 | DMA_HIFCR_CHTIF6 | DMA_HIFCR_CTCIF6);
+        DMA1_Stream6->CR |= DMA_SxCR_EN;
+        //while (!(I2C1->SR2 & I2C_SR2_BUSY)){;}
+
+    } else {
+        /* Null pointers, do nothing */
+    }
+}
+
+static void DMA_Receive(const uint8_t size) {
+    if(size < 16) {
+        while (_i2c1_mrk_rx != 0x00) {;}  // Ждем пока предыдущая передача не закончится
+        _i2c1_mrk_rx = 0x01;
+        DMA1_Stream5->CR &= ~DMA_SxCR_EN;
+	    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
+        DMA1_Stream5->NDTR = size;
+        DMA1->HIFCR = ( DMA_HIFCR_CDMEIF5 | DMA_HIFCR_CTEIF5 | DMA_HIFCR_CHTIF5 | DMA_HIFCR_CTCIF5);
+        DMA1_Stream5->CR |= DMA_SxCR_EN;
+    } else {
+        //GPIOD->ODR ^= GPIO_ODR_OD12;
+        /* Null pointers, do nothing */
+    }
+}
+
+static void DMA_Receive_read(uint8_t *pBuffer, uint8_t size) {
+    if((NULL != pBuffer) && (size < 16)) {
+        while (_i2c1_mrk_rx_work == 0x00) {;}  // Ждем пока предыдущая передача не закончится
+        _i2c1_mrk_rx_work = 0x00;
+        DMA1_Stream5->CR &= ~DMA_SxCR_EN;
+	    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
+        for (uint8_t i = 0; i < size; ++i) {
+            *(pBuffer + i) = _i2c1_data_rx[i];
+        }
+    } else {
+        //GPIOD->ODR ^= GPIO_ODR_OD12;
+        /* Null pointers, do nothing */
+    }
+}
+
+uint8_t I2C1_Read_with_DMA(const uint8_t _reg_addr) {
+    uint8_t _data[1] = { _reg_addr};
+
+    // 0.  Ждем не занят ли шина I2C
+    while (I2C1->SR2 & I2C_SR2_BUSY);
+
+    // 1. Запускаем передачу
+	I2C1->CR1 |= I2C_CR1_START;
+	
+    // 2. Ждем пока будет отправлен начальный бит
+	while (!(I2C1->SR1 & I2C_SR1_SB));
+	
+    // 3. Отправляем в канал адрес, для того чтобы происходила запись данных \
+    //    его надо сместить в лево на 1 бит и оставить ноль первым битом
+	I2C1->DR = (BME280_ADDRESS << 1);
+    while (!(I2C1->SR1 & I2C_SR1_ADDR));
+    (void) I2C1->SR1;
+    (void) I2C1->SR2;
+
+    // 4. Начинаем DMA отправку
+    DMA_Transmit(&_data[0], 1);
+	(void)I2C1->SR1;
+	(void)I2C1->SR2;
+
+    // 5. Ожидаем завершение передачи
+	while(!(I2C_SR1_BTF & I2C1->SR1)){;} 
+
+    // 6. Производим рестарт
+	I2C1->CR1 |= I2C_CR1_START;
+	while(!(I2C1->SR1 & I2C_SR1_SB)){};
+
+	// 7. Передаем адрес устройства, но теперь для чтения
+	I2C1->DR = ((BME280_ADDRESS << 1) | 0x01);
+	while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
+	(void) I2C1->SR1;
+	(void) I2C1->SR2;
+
+	// 8. Считываем данные
+    DMA_Receive(1);
+    DMA_Receive_read(&_data[0], 1);
+
+    // 9. Производим остановку
+	I2C1->CR1 |= I2C_CR1_STOP;
+
+	return _data[0];
 }
 
 void I2C1_write(uint8_t address) {
@@ -82,7 +245,7 @@ void I2C1_write(uint8_t address) {
 	I2C1->CR1 |= I2C_CR1_STOP;
 }
 
-uint8_t I2C1_Read(const uint8_t reg_addr) {
+uint8_t I2C1_Read(const uint8_t _reg_addr) {
     uint8_t _data = 0x00;
 
     // 0.  Ждем не занят ли шина I2C
@@ -102,7 +265,7 @@ uint8_t I2C1_Read(const uint8_t reg_addr) {
     (void) I2C1->SR2;
 
     // 4. Передаем адрес регистра
-	I2C1->DR = reg_addr;
+	I2C1->DR = _reg_addr;
 	while(!(I2C1->SR1 & I2C_SR1_TXE)){};
 
     // 5. Останавливаем передачу
@@ -121,48 +284,12 @@ uint8_t I2C1_Read(const uint8_t reg_addr) {
 	// 8. Считываем данные
 	I2C1->CR1 &= ~I2C_CR1_ACK;
 	while(!(I2C1->SR1 & I2C_SR1_RXNE)){};
-	data = I2C1->DR;
+	_data = I2C1->DR;
 
     // 9. Производим остановку
 	I2C1->CR1 |= I2C_CR1_STOP;
 
-	return data;
-#if 0
-	uint8_t data;
-	//стартуем
-	I2C1->CR1 |= I2C_CR1_START;
-	while(!(I2C1->SR1 & I2C_SR1_SB)){};
-	(void) I2C1->SR1;
-
-	//передаем адрес устройства
-	while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
-	(void) I2C1->SR1;
-	(void) I2C1->SR2;
-
-	//передаем адрес регистра
-	I2C1->DR = reg_addr;
-	while(!(I2C1->SR1 & I2C_SR1_TXE)){};
-	I2C1->CR1 |= I2C_CR1_STOP;
-
-	//рестарт!!!
-	I2C1->CR1 |= I2C_CR1_START;
-	while(!(I2C1->SR1 & I2C_SR1_SB)){};
-	(void) I2C1->SR1;
-
-	//передаем адрес устройства, но теперь для чтения
-	I2C1->DR = ((BME280_ADDRESS << 1) | 0x01);
-	while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
-	(void) I2C1->SR1;
-	(void) I2C1->SR2;
-
-	//читаем
-	I2C1->CR1 &= ~I2C_CR1_ACK;
-	while(!(I2C1->SR1 & I2C_SR1_RXNE)){};
-	data = I2C1->DR;
-	I2C1->CR1 |= I2C_CR1_STOP;
-
-	return data;
-#endif
+	return _data;
 }
 
 void GPIOD_init() {
@@ -175,9 +302,6 @@ int main(void) {
     GPIOD_init();
     uint8_t id = 0;
     while (1) {
-        id = I2C1_Read(BME280_ID);
+        id = I2C1_Read_with_DMA(BME280_ID);
     }
-    //for (uint8_t i = 0; i < 128; i++) {
-    //    I2C1_write(i);
-    //}
 }

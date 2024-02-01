@@ -1,11 +1,13 @@
 #include "../system/include/cmsis/stm32f4xx.h"
 
 #include "SH_GPIO.h"
+#include "SH_I2C.h"
 
 #define BME280_ADDRESS 0b01110110
 
 #define BME280_ID 0xD0
 
+#if 0
 uint8_t _i2c1_data_rx[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t _i2c1_data_tx[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t _i2c1_mrk_rx = 0x00;
@@ -296,11 +298,19 @@ uint8_t I2C1_Read(const uint8_t _reg_addr) {
 
 	return _data;
 }
+#endif
 
 SH_GPIO PD12_LED_GREEN(GPIOD, 12, 0x40);
 
 SH_GPIO PB6_I2C1_SCL(GPIOB, 6, 0xA3, 0x04);
 SH_GPIO PB9_I2C1_SDA(GPIOB, 9, 0xA3, 0x04);
+
+SH_I2C I2C1_FS(I2C1, 0x01, 50);
+
+void I2C1_init() {
+    I2C1_FS._ClockInit();
+    I2C1_FS._enable();
+}
 
 void GPIOD_init() {
     PD12_LED_GREEN._ON();
@@ -313,6 +323,6 @@ int main(void) {
     GPIOD_init();
     uint8_t id = 0;
     while (1) {
-        id = I2C1_Read(BME280_ID);
+        id = I2C1_FS._read_reg(BME280_ADDRESS, BME280_ID);
     }
 }

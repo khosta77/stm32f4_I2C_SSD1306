@@ -19,7 +19,7 @@ class SH_GPIO {
     const uint8_t _alternativ;
 
 public:
-    SH_GPIO(GPIO_TypeDef *GPIOx,        // Задать номер GPIOx
+    SH_GPIO(GPIO_TypeDef *GPIOx,              // Задать номер GPIOx
             const uint8_t &pin_number,        // Номер вывода P0-15
             const uint8_t &pin_options,       // Настройка: 
                                               // 0b   xx  |    x   | xx      |   xx  |   x

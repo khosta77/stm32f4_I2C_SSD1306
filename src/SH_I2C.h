@@ -76,8 +76,33 @@ void buffer() {
 
 class SH_I2C {
     I2C_TypeDef *_I2Cx;
+    /* 
+     * 01234567
+     * -+------------------------------------
+     * 0|0 - DMA off
+     *  |1 - DMA on, после передачи сработает 
+     * -+------------------------------------
+     * 1|
+     * -+------------------------------------
+     * 2|
+     * -+------------------------------------
+     * 3|
+     * -+------------------------------------
+     * 4|
+     * -+------------------------------------
+     * 5|
+     * -+------------------------------------
+     * 6|0 - DUTY off
+     *  |1 - DUTY on
+     * -+------------------------------------
+     * 7|0 - Sm
+     *  |1 - Fm
+     * -+------------------------------------
+     * */
     uint8_t _options;
     uint8_t _slave_freq;
+    
+    uint32_t I2C_mode_speed = 10000;
     
 public:
     SH_I2C(I2C_TypeDef *I2Cx,
@@ -133,36 +158,63 @@ public:
             NVIC_SetPriority(DMA1_Stream6_IRQn, 3);
 #endif
         }
-    
+
+        if ((_options & 0x01) == 0x01) {
+            I2C1->CCR |= I2C_CCR_FS;
+            I2C_mode_speed = 2500;
+        }
+
+        if ((_options & 0x02) == 0x02)
+            I2C1->CCR |= I2C_CCR_DUTY;
+
         I2C1->CR2 |= (_slave_freq & 0x3F);
 
     }
 
 private:
-    inline uint32_t get_f_pclk() {
-        uint32_t f_pclk = 0;
+    inline float get_f_pclk() {
+        uint32_t f_apb1 = 0;
         uint32_t divided = 0;
         uint32_t cfgr = RCC->CFGR;
 
         SystemCoreClockUpdate();
-        f_pclk = SystemCoreClock;
+        f_apb1 = SystemCoreClock;
 
         if ((cfgr & 0x00000080) == 1) {
             divided = (((cfgr & 0x00000070) >> 4) + 2);
-            f_pclk /= (0x00000001 << divided);
+            f_apb1 /= (0x00000001 << divided);
         }
 
         if ((cfgr & 0x00001000) == 1) {
             divided = (((cfgr & 0x00000C00) >> 10) + 2);
-            f_pclk /= (0x00000001 << divided);
+            f_apb1 /= (0x00000001 << divided);
         }
 
-        return f_pclk;
+        float f_pclk1 = 1 / f_apb1;
+
+        return f_pclk1;
+    }
+
+    inline uint8_t get_coefficient() {
+        uint8_t coefficient = 2;
+        if ((_options & 0x01) == 0x01)
+            if ((_options & 0x02) == 0x02)
+                coefficient = 3;
+            else
+                coefficient = 25;
+        return coefficient;
+    }
+
+    void _clock_ccr_init() {
+        const float f_pclk1 = get_f_pclk();
+        const uint8_t coefficient = get_coefficient();
+        const uint16_t ccr = ((uint16_t)(I2C_mode_speed / (coefficient * f_pclk1)) & 0x0FFF);
+        _I2Cx->CCR |= ccr;
     }
 
 public:
     void _ClockInit() {
-
+        _clock_ccr_init();
     }
 
     void _enable() {

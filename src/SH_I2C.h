@@ -1,6 +1,7 @@
 #ifndef STEPAN_HAL_I2C_H_
 #define STEPAN_HAL_I2C_H_
 
+#if 0
 void buffer() {
     // I2C init
     RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
@@ -73,6 +74,8 @@ void buffer() {
     NVIC_EnableIRQ(DMA1_Stream6_IRQn);
     NVIC_SetPriority(DMA1_Stream6_IRQn, 3);
 }
+#endif
+
 
 class SH_I2C {
     I2C_TypeDef *_I2Cx;
@@ -227,6 +230,60 @@ public:
 
     void _enable() {
         I2C1->CR1 |= I2C_CR1_PE;
+    }
+
+    void _write_reg(uint8_t _address, uint8_t _register, uint8_t _data) {
+        _address = 0;
+        _register = 0;
+        _data = 0;
+        // TODO
+    }
+
+    uint8_t _read_reg(uint8_t _address, uint8_t _register) {
+        uint8_t _data = 0x00;
+
+        // 0.  Ждем не занят ли шина I2C
+        while (I2C1->SR2 & I2C_SR2_BUSY);
+
+        // 1. Запускаем передачу
+	    I2C1->CR1 |= I2C_CR1_START;
+	
+        // 2. Ждем пока будет отправлен начальный бит
+	    while (!(I2C1->SR1 & I2C_SR1_SB));
+	
+        // 3. Отправляем в канал адрес, для того чтобы происходила запись данных \
+        //    его надо сместить в лево на 1 бит и оставить ноль первым битом
+	    I2C1->DR = (_address << 1);
+        while (!(I2C1->SR1 & I2C_SR1_ADDR));
+        (void) I2C1->SR1;
+        (void) I2C1->SR2;
+
+        // 4. Передаем адрес регистра
+	    I2C1->DR = _register;
+	    while(!(I2C1->SR1 & I2C_SR1_TXE)){};
+
+        // 5. Останавливаем передачу
+    	I2C1->CR1 |= I2C_CR1_STOP;
+
+        // 6. Производим рестарт
+	    I2C1->CR1 |= I2C_CR1_START;
+	    while(!(I2C1->SR1 & I2C_SR1_SB)){};
+
+	    // 7. Передаем адрес устройства, но теперь для чтения
+	    I2C1->DR = ((_address << 1) | 0x01);
+	    while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
+	    (void) I2C1->SR1;
+	    (void) I2C1->SR2;
+
+	    // 8. Считываем данные
+	    I2C1->CR1 &= ~I2C_CR1_ACK;
+	    while(!(I2C1->SR1 & I2C_SR1_RXNE)){};
+	    _data = I2C1->DR;
+
+        // 9. Производим остановку
+    	I2C1->CR1 |= I2C_CR1_STOP;
+
+	    return _data;
     }
 };
 

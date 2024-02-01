@@ -102,7 +102,10 @@ class SH_I2C {
     uint8_t _options;
     uint8_t _slave_freq;
     
-    uint32_t I2C_mode_speed = 10000;
+    float t_pclk1;
+    uint16_t I2C_mode_speed = 10000;
+    uint16_t I2C_trice = 1000;
+
     
 public:
     SH_I2C(I2C_TypeDef *I2Cx,
@@ -162,6 +165,7 @@ public:
         if ((_options & 0x01) == 0x01) {
             I2C1->CCR |= I2C_CCR_FS;
             I2C_mode_speed = 2500;
+            I2C_trice = 300;
         }
 
         if ((_options & 0x02) == 0x02)
@@ -172,7 +176,7 @@ public:
     }
 
 private:
-    inline float get_f_pclk() {
+    void t_pclk1_calculated() {
         uint32_t f_apb1 = 0;
         uint32_t divided = 0;
         uint32_t cfgr = RCC->CFGR;
@@ -190,9 +194,7 @@ private:
             f_apb1 /= (0x00000001 << divided);
         }
 
-        float f_pclk1 = 1 / f_apb1;
-
-        return f_pclk1;
+        t_pclk1 = 1 / f_apb1;
     }
 
     inline uint8_t get_coefficient() {
@@ -206,15 +208,21 @@ private:
     }
 
     void _clock_ccr_init() {
-        const float f_pclk1 = get_f_pclk();
         const uint8_t coefficient = get_coefficient();
-        const uint16_t ccr = ((uint16_t)(I2C_mode_speed / (coefficient * f_pclk1)) & 0x0FFF);
+        const uint16_t ccr = ((uint16_t)(I2C_mode_speed / (coefficient * t_pclk1)) & 0x0FFF);
         _I2Cx->CCR |= ccr;
+    }
+
+    void _clock_trise_init() {
+        const uint16_t trice = (((uint16_t)(I2C_trice / t_pclk1) + 1) & 0x003F);
+        _I2Cx->TRISE |= trice;
     }
 
 public:
     void _ClockInit() {
+        t_pclk1_calculated();
         _clock_ccr_init();
+        _clock_trise_init();
     }
 
     void _enable() {

@@ -106,7 +106,8 @@ class SH_I2C {
     uint8_t _slave_freq;
     
     float t_pclk1;
-    uint16_t I2C_mode_speed = 10000;
+    // TODO: Пересчитать
+    uint16_t I2C_mode_speed = 10000;  // Это наносекунды
     uint16_t I2C_trice = 1000;
 
     
@@ -188,7 +189,7 @@ private:
         f_apb1 = SystemCoreClock;
 
         if ((cfgr & 0x00000080) == 1) {
-            divided = (((cfgr & 0x00000070) >> 4) + 2);
+            divided = (((cfgr & 0x00000070) >> 4));
             f_apb1 /= (0x00000001 << divided);
         }
 
@@ -203,7 +204,7 @@ private:
     inline uint8_t get_coefficient() {
         uint8_t coefficient = 2;
         if ((_options & 0x01) == 0x01)
-            if ((_options & 0x02) == 0x02)
+            if ((_options & 0x02) != 0x02)
                 coefficient = 3;
             else
                 coefficient = 25;

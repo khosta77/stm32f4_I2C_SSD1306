@@ -138,6 +138,36 @@ public:
 
     }
 
+private:
+    inline uint32_t get_f_pclk() {
+        uint32_t f_pclk = 0;
+        uint32_t divided = 0;
+        uint32_t cfgr = RCC->CFGR;
+
+        SystemCoreClockUpdate();
+        f_pclk = SystemCoreClock;
+
+        if ((cfgr & 0x00000080) == 1) {
+            divided = (((cfgr & 0x00000070) >> 4) + 2);
+            f_pclk /= (0x00000001 << divided);
+        }
+
+        if ((cfgr & 0x00001000) == 1) {
+            divided = (((cfgr & 0x00000C00) >> 10) + 2);
+            f_pclk /= (0x00000001 << divided);
+        }
+
+        return f_pclk;
+    }
+
+public:
+    void _ClockInit() {
+
+    }
+
+    void _enable() {
+        I2C1->CR1 |= I2C_CR1_PE;
+    }
 };
 
 #endif  // STEPAN_HAL_I2C_H_

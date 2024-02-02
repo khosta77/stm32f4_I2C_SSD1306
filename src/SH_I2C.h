@@ -1,6 +1,8 @@
 #ifndef STEPAN_HAL_I2C_H_
 #define STEPAN_HAL_I2C_H_
 
+#include "../system/include/cmsis/stm32f4xx.h"
+
 #if 0
 void buffer() {
     // I2C init
@@ -106,9 +108,8 @@ class SH_I2C {
     uint8_t _slave_freq;
     
     float t_pclk1;
-    // TODO: Пересчитать
-    uint16_t I2C_mode_speed = 10000;  // Это наносекунды
-    uint16_t I2C_trice = 1000;
+    float I2C_mode_speed = 0.00001f;  // Это наносекунды
+    float I2C_trice = 0.0000001f;
 
     
 public:
@@ -168,8 +169,8 @@ public:
 
         if ((_options & 0x01) == 0x01) {
             I2C1->CCR |= I2C_CCR_FS;
-            I2C_mode_speed = 2500;
-            I2C_trice = 300;
+            I2C_mode_speed = 0.0000025f;
+            I2C_trice = 0.0000003f;
         }
 
         if ((_options & 0x02) == 0x02)
@@ -198,11 +199,11 @@ private:
             f_apb1 /= (0x00000001 << divided);
         }
 
-        t_pclk1 = 1 / f_apb1;
+        t_pclk1 = 1.0f / (f_apb1 * 1.0f);
     }
 
-    inline uint8_t get_coefficient() {
-        uint8_t coefficient = 2;
+    inline float get_coefficient() {
+        float coefficient = 2;
         if ((_options & 0x01) == 0x01)
             if ((_options & 0x02) != 0x02)
                 coefficient = 3;
@@ -212,13 +213,13 @@ private:
     }
 
     void _clock_ccr_init() {
-        const uint8_t coefficient = get_coefficient();
-        const uint16_t ccr = ((uint16_t)(I2C_mode_speed / (coefficient * t_pclk1)) & 0x0FFF);
+        const float coefficient = get_coefficient();
+        const uint16_t ccr = (((uint16_t)(I2C_mode_speed / (coefficient * t_pclk1))) & 0x0FFF);
         _I2Cx->CCR |= ccr;
     }
 
     void _clock_trise_init() {
-        const uint16_t trice = (((uint16_t)(I2C_trice / t_pclk1) + 1) & 0x003F);
+        const uint16_t trice = ((((uint16_t)(I2C_trice / t_pclk1)) + 1) & 0x003F);
         _I2Cx->TRISE |= trice;
     }
 

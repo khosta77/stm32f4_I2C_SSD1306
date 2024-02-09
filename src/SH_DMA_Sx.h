@@ -3,7 +3,7 @@
 
 #include "../system/include/cmsis/stm32f4xx.h"
 
-#if 1
+#if 0
 void DMA1_Stream6_IRQHandler(void) {  // TX
     if ((DMA1->HISR & DMA_HISR_TCIF6) == DMA_HISR_TCIF6) {
         //GPIOD->ODR ^= GPIO_ODR_OD12;
@@ -74,7 +74,7 @@ uint8_t _dmax_irq_status[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 #define DMAx_IRQ_STATUS_TEIF  0b00000100  // Ошибка передачи
 #define DMAx_IRQ_STATUS_DMEIF 0b00001000  // Ошибка direct-режима
 #define DMAx_IRQ_STATUS_FEIF  0b00010000  // Ошибка FIFO
-#define DMAx_IRQ_STATUS_CT    0b10000000
+#define DMAx_IRQ_STATUS_CT    0b10000000  // Массив 1 или 0
 
 void DMA1_Stream0_IRQHandler(void) {
     if ((DMA1->LISR & DMA_LISR_TCIF0) == DMA_LISR_TCIF0) {  // Полная передача
@@ -589,19 +589,153 @@ void DMA2_Stream7_IRQHandler(void) {
     }
 }
 
+/* P может быть: I2C_TypeDef, SPI_TypeDef, USART_TypeDef
+ * A может быть: uint8_t, uint16_t, uint32_t
+ * */
 template<typename P, typename A>
 class SH_DMA_Sx {
     DMA_Stream_TypeDef *_DMA_Sx;
     DMA_TypeDef *_DMA;
     P *_periphery;
     uint32_t _options_cr;
+    uint16_t _size;
     uint8_t _priority;
+    uint8_t _dma_stream = 0x00;
 
+    void _dmax_init() {
+        if ((_DMA_Sx == DMA1_Stream0) || (_DMA_Sx == DMA1_Stream1) || (_DMA_Sx == DMA1_Stream2) ||
+            (_DMA_Sx == DMA1_Stream3) || (_DMA_Sx == DMA1_Stream4) || (_DMA_Sx == DMA1_Stream5) ||
+            (_DMA_Sx == DMA1_Stream6) || (_DMA_Sx == DMA1_Stream7)) {
+            RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+            _DMA = DMA1;
+        }
 
+        if ((_DMA_Sx == DMA2_Stream0) || (_DMA_Sx == DMA2_Stream1) || (_DMA_Sx == DMA2_Stream2) ||
+            (_DMA_Sx == DMA2_Stream3) || (_DMA_Sx == DMA2_Stream4) || (_DMA_Sx == DMA2_Stream5) ||
+            (_DMA_Sx == DMA2_Stream6) || (_DMA_Sx == DMA2_Stream7)) {
+            RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+            _DMA = DMA2;
+        }
+    }
+
+    void _iqr_dma_sx_init(const uint8_t &irq_priority) {
+        //// DMA1
+        if (_DMA_Sx == DMA1_Stream0) {
+            _dma_stream = 0;
+            _DMA->LIFCR |= (DMA_LIFCR_CTCIF0 | DMA_LIFCR_CHTIF0 | DMA_LIFCR_CTEIF0 | DMA_LIFCR_CDMEIF0 | DMA_LIFCR_CFEIF0);
+            NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+            NVIC_SetPriority(DMA1_Stream0_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA1_Stream1) {
+            _dma_stream = 1;
+            _DMA->LIFCR |= (DMA_LIFCR_CTCIF1 | DMA_LIFCR_CHTIF1 | DMA_LIFCR_CTEIF1 | DMA_LIFCR_CDMEIF1 | DMA_LIFCR_CFEIF1);
+            NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+            NVIC_SetPriority(DMA1_Stream1_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA1_Stream2) {
+            _dma_stream = 2;
+            _DMA->LIFCR |= (DMA_LIFCR_CTCIF2 | DMA_LIFCR_CHTIF2 | DMA_LIFCR_CTEIF2 | DMA_LIFCR_CDMEIF2 | DMA_LIFCR_CFEIF2);
+            NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+            NVIC_SetPriority(DMA1_Stream2_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA1_Stream3) {
+            _dma_stream = 3;
+            _DMA->LIFCR |= (DMA_LIFCR_CTCIF3 | DMA_LIFCR_CHTIF3 | DMA_LIFCR_CTEIF3 | DMA_LIFCR_CDMEIF3 | DMA_LIFCR_CFEIF3);
+            NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+            NVIC_SetPriority(DMA1_Stream3_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA1_Stream4) {
+            _dma_stream = 4;
+            _DMA->HIFCR |= (DMA_HIFCR_CTCIF4 | DMA_HIFCR_CHTIF4 | DMA_HIFCR_CTEIF4 | DMA_HIFCR_CDMEIF4 | DMA_HIFCR_CFEIF4);
+            NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+            NVIC_SetPriority(DMA1_Stream4_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA1_Stream5) {
+            _dma_stream = 5;
+            _DMA->HIFCR |= (DMA_HIFCR_CTCIF5 | DMA_HIFCR_CHTIF5 | DMA_HIFCR_CTEIF5 | DMA_HIFCR_CDMEIF5 | DMA_HIFCR_CFEIF5);
+            NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+            NVIC_SetPriority(DMA1_Stream5_IRQn, irq_priority);
+        }
+
+        if (_DMA_Sx == DMA1_Stream6) {
+            _dma_stream = 6;
+            _DMA->HIFCR |= (DMA_HIFCR_CTCIF6 | DMA_HIFCR_CHTIF6 | DMA_HIFCR_CTEIF6 | DMA_HIFCR_CDMEIF6 | DMA_HIFCR_CFEIF6);
+            NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+            NVIC_SetPriority(DMA1_Stream6_IRQn, irq_priority);
+        }
+
+        if (_DMA_Sx == DMA1_Stream7) {
+            _dma_stream = 7;
+            _DMA->HIFCR |= (DMA_HIFCR_CTCIF7 | DMA_HIFCR_CHTIF7 | DMA_HIFCR_CTEIF7 | DMA_HIFCR_CDMEIF7 | DMA_HIFCR_CFEIF7);
+            NVIC_EnableIRQ(DMA1_Stream7_IRQn);
+            NVIC_SetPriority(DMA1_Stream7_IRQn, irq_priority);
+        }
+
+        //// DMA2
+        if (_DMA_Sx == DMA2_Stream0) {
+            _dma_stream = 8;
+            _DMA->LIFCR |= (DMA_LIFCR_CTCIF0 | DMA_LIFCR_CHTIF0 | DMA_LIFCR_CTEIF0 | DMA_LIFCR_CDMEIF0 | DMA_LIFCR_CFEIF0);
+            NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+            NVIC_SetPriority(DMA2_Stream0_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA2_Stream1) {
+            _dma_stream = 9;
+            _DMA->LIFCR |= (DMA_LIFCR_CTCIF1 | DMA_LIFCR_CHTIF1 | DMA_LIFCR_CTEIF1 | DMA_LIFCR_CDMEIF1 | DMA_LIFCR_CFEIF1);
+            NVIC_EnableIRQ(DMA2_Stream1_IRQn);
+            NVIC_SetPriority(DMA2_Stream1_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA2_Stream2) {
+            _dma_stream = 10;
+            _DMA->LIFCR |= (DMA_LIFCR_CTCIF2 | DMA_LIFCR_CHTIF2 | DMA_LIFCR_CTEIF2 | DMA_LIFCR_CDMEIF2 | DMA_LIFCR_CFEIF2);
+            NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+            NVIC_SetPriority(DMA2_Stream2_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA2_Stream3) {
+            _dma_stream = 11;
+            _DMA->LIFCR |= (DMA_LIFCR_CTCIF3 | DMA_LIFCR_CHTIF3 | DMA_LIFCR_CTEIF3 | DMA_LIFCR_CDMEIF3 | DMA_LIFCR_CFEIF3);
+            NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+            NVIC_SetPriority(DMA2_Stream3_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA2_Stream4) {
+            _dma_stream = 12;
+            _DMA->HIFCR |= (DMA_HIFCR_CTCIF4 | DMA_HIFCR_CHTIF4 | DMA_HIFCR_CTEIF4 | DMA_HIFCR_CDMEIF4 | DMA_HIFCR_CFEIF4);
+            NVIC_EnableIRQ(DMA2_Stream4_IRQn);
+            NVIC_SetPriority(DMA2_Stream4_IRQn, irq_priority);
+        }
+        
+        if (_DMA_Sx == DMA2_Stream5) {
+            _dma_stream = 13;
+            _DMA->HIFCR |= (DMA_HIFCR_CTCIF5 | DMA_HIFCR_CHTIF5 | DMA_HIFCR_CTEIF5 | DMA_HIFCR_CDMEIF5 | DMA_HIFCR_CFEIF5);
+            NVIC_EnableIRQ(DMA2_Stream5_IRQn);
+            NVIC_SetPriority(DMA2_Stream5_IRQn, irq_priority);
+        }
+
+        if (_DMA_Sx == DMA2_Stream6) {
+            _dma_stream = 14;
+            _DMA->HIFCR |= (DMA_HIFCR_CTCIF6 | DMA_HIFCR_CHTIF6 | DMA_HIFCR_CTEIF6 | DMA_HIFCR_CDMEIF6 | DMA_HIFCR_CFEIF6);
+            NVIC_EnableIRQ(DMA2_Stream6_IRQn);
+            NVIC_SetPriority(DMA2_Stream6_IRQn, irq_priority);
+        }
+
+        if (_DMA_Sx == DMA2_Stream7) {
+            _dma_stream = 15;
+            _DMA->HIFCR |= (DMA_HIFCR_CTCIF7 | DMA_HIFCR_CHTIF7 | DMA_HIFCR_CTEIF7 | DMA_HIFCR_CDMEIF7 | DMA_HIFCR_CFEIF7);
+            NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+            NVIC_SetPriority(DMA2_Stream7_IRQn, irq_priority);
+        }
+    }
 public:
     A *_array_0;
     A *_array_1;
-    uint16_t _size;
 
     SH_DMA_Sx(DMA_Stream_TypeDef *DMA_Sx,
               P *periphery,
@@ -609,33 +743,156 @@ public:
               A *array_0,
               A *array_1,
               const uint16_t &size,
-              const uint8_t &priority
+              const uint8_t &priority,
+              const uint8_t &irq_priority
               ) : _DMA_Sx(DMA_Sx), _periphery(periphery), _options_cr(options_cr),
                   _array_0(array_0), _array_1(array_1), _size(size), _priority(priority)
     {
         uint8_t status = 0x00;
 
-        if ((_DMA_Sx == DMA1_Stream0) || (_DMA_Sx == DMA1_Stream1) || (_DMA_Sx == DMA1_Stream2) || (_DMA_Sx == DMA1_Stream3) || (_DMA_Sx == DMA1_Stream4) || (_DMA_Sx == DMA1_Stream5) || (_DMA_Sx == DMA1_Stream6) || (_DMA_Sx == DMA1_Stream7))
-            RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+        // Включаем тактирование, назначаем внутреннеию переменную _DMA
+        _dmax_init();
 
-        if ((_DMA_Sx == DMA2_Stream0) || (_DMA_Sx == DMA2_Stream1) || (_DMA_Sx == DMA2_Stream2) || (_DMA_Sx == DMA2_Stream3) || (_DMA_Sx == DMA2_Stream4) || (_DMA_Sx == DMA2_Stream5) || (_DMA_Sx == DMA2_Stream6) || (_DMA_Sx == DMA2_Stream7)) {
-            RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
-            _DMA = DMA2;
+        // Отключаем DMA, для настройки
+        _DMA_Sx->CR &= ~DMA_SxCR_EN;
+        while ((_DMA_Sx->CR) & DMA_SxCR_EN){;}
 
-        // Отключаем DMA, для чтения
+        // Настройка DMA по документаци
+        _DMA_Sx->CR = _options_cr;
+
+        // Задаем потоки передачи/приема
+        _DMA_Sx->PAR = (uint32_t)&_periphery->DR;
+        _DMA_Sx->M0AR = (uint32_t)&_array_0[0];
+        _DMA_Sx->M1AR = (uint32_t)&_array_1[0];
+        _DMA_Sx->NDTR = _size;
+
+        // Инициализируем прирывания
+        _iqr_dma_sx_init(irq_priority);
+    }
+
+    inline uint16_t size() const {
+        return _size;
+    }
+#if 1
+static void DMA_Transmit(const uint8_t *pBuffer, uint32_t size) {
+    if((NULL != pBuffer) && (size < 16)) {
+        while (_i2c1_mrk_tx != 0x00) {;}  // Ждем пока предыдущая передача не закончится
+        _i2c1_mrk_tx = 0x01;
+        DMA1_Stream6->CR &= ~DMA_SxCR_EN;
+        while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
+        for (uint8_t i = 0; i < size; ++i) {
+            _i2c1_data_tx[i] = pBuffer[i];
+        }
+
+        DMA1_Stream6->NDTR = size;
+        DMA1->HIFCR = DMA_HIFCR_CTCIF6;
+        DMA1_Stream6->CR |= DMA_SxCR_EN;
+        //while (!(I2C1->SR2 & I2C_SR2_BUSY)){;}
+
+    } else {
+        /* Null pointers, do nothing */
+    }
+}
+
+static void DMA_Receive(const uint8_t size) {
+    if(size < 16) {
+        while (_i2c1_mrk_rx != 0x00) {;}  // Ждем пока предыдущая передача не закончится
+        _i2c1_mrk_rx = 0x01;
         DMA1_Stream5->CR &= ~DMA_SxCR_EN;
-        while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
-        DMA1_Stream5->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_TCIE);
+	    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
+        DMA1_Stream5->NDTR = size;
+        DMA1->HIFCR = DMA_HIFCR_CTCIF5;
+        DMA1_Stream5->CR |= DMA_SxCR_EN;
+    } else {
+        //GPIOD->ODR ^= GPIO_ODR_OD12;
+        /* Null pointers, do nothing */
+    }
+}
 
-        DMA1_Stream5->PAR = (uint32_t)&I2C1->DR;
-        DMA1_Stream5->M0AR = (uint32_t)&_i2c1_data_rx[0];
+static void DMA_Receive_read(uint8_t *pBuffer, uint8_t size) {
+    if((NULL != pBuffer) && (size < 16)) {
+        while (_i2c1_mrk_rx_work == 0x00) {;}  // Ждем пока предыдущая передача не закончится
+        _i2c1_mrk_rx_work = 0x00;
+        DMA1_Stream5->CR &= ~DMA_SxCR_EN;
+	    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
+        for (uint8_t i = 0; i < size; ++i) {
+            *(pBuffer + i) = _i2c1_data_rx[i];
+        }
+    } else {
+        //GPIOD->ODR ^= GPIO_ODR_OD12;
+        /* Null pointers, do nothing */
+    }
+}
+#endif
 
-        DMA1->HIFCR |= DMA_HIFCR_CTCIF5;  // Включаем прерывание после успешной передачи передачи
-        NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-        NVIC_SetPriority(DMA1_Stream5_IRQn, 2);
+private:
+    void fuller_array(A *_array, const A *pBuffer) {
+        for (uint32_t i = 0; i < _size; ++i) {
+            _array[i] = pBuffer[i];
+        }
+    }
 
+public:
+    void dma_transmit(const A *pBuffer) {
+        if(pBuffer != nullptr) {
+            // Ждем/проверяем пока передача не закончится
+            while ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF) {;}
+            
+            // Отключаем DMA
+            _DMA_Sx->CR &= ~DMA_SxCR_EN;
+            while ((_DMA_Sx->CR) & DMA_SxCR_EN){;}
 
+            // Выбираем и заполняем массив
+            if ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_CT) == DMAx_IRQ_STATUS_CT) {
+                _DMA_Sx->CR &= ~DMA_SxCR_CT;
+                _dmax_irq_status[_dma_stream] &= ~DMAx_IRQ_STATUS_CT;
+                fuller_array(_array_0, pBuffer);
+            } else {
+                _DMA_Sx->CR |= DMA_SxCR_CT;
+                _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_CT;
+                fuller_array(_array_1, pBuffer);
+            }
 
+            // Выставляем маркер начала передачи.
+            _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_CT;
+
+            while (stftcb_array_tx_status != 0x00) {;}  // Ждем пока предыдущая передача не закончится
+            stftcb_SetAddressWindow(0, count_l, STFTCB_WIDTH, count_l);
+            ++count_l;
+
+            SPI_1byte_mode_on();
+            STFTCB_DC_ON;
+            STFTCB_SPI_DMA_SxCR->CR &= ~DMA_SxCR_EN;
+            while ((STFTCB_SPI_DMA_SxCR->CR) & DMA_SxCR_EN){;}
+
+            if (stftcb_array_tx_mxar == 0) {
+                STFTCB_SPI_DMA_SxCR->CR &= ~DMA_SxCR_CT;
+                stftcb_array_tx_mxar = 0x01;
+            } else {
+                STFTCB_SPI_DMA_SxCR->CR |= DMA_SxCR_CT;
+                stftcb_array_tx_mxar = 0x00;
+            }
+
+            stftcb_array_tx_status = 0x11;
+            STFTCB_SPI_DMA_SxCR->NDTR = STFTCB_ARRAY_SIZE;
+            STFTCB_SPI_DMA_SxCR->CR |= DMA_SxCR_MINC;
+            STFTCB_SPI_DMA_SxCR->CR |= DMA_SxCR_EN;
+
+            while (_i2c1_mrk_tx != 0x00) {;}  // Ждем пока предыдущая передача не закончится
+            _i2c1_mrk_tx = 0x01;
+            DMA1_Stream6->CR &= ~DMA_SxCR_EN;
+            while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
+            for (uint8_t i = 0; i < size; ++i) {
+                _i2c1_data_tx[i] = pBuffer[i];
+            }
+
+            DMA1_Stream6->NDTR = size;
+            DMA1->HIFCR = DMA_HIFCR_CTCIF6;
+            DMA1_Stream6->CR |= DMA_SxCR_EN;
+            //while (!(I2C1->SR2 & I2C_SR2_BUSY)){;}
+        } else {
+            /* Null pointers, do nothing */
+        }
     }
 };
 

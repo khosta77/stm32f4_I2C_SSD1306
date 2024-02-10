@@ -243,12 +243,32 @@ public:
     }
 
     void _write_reg(uint8_t _address, uint8_t _register, uint8_t _data) {
-        _address = 0;
-        _register = 0;
-        _data = 0;
-        // TODO
+        // 0. Ждем не занят ли шина I2C
+	    while (I2C1->SR2 & I2C_SR2_BUSY);
 
+        // 1. Запускаем передачу
+	    I2C1->CR1 |= I2C_CR1_START;
+    
+        // 2. Ждем пока будет отправлен начальный бит
+	    while (!(I2C1->SR1 & I2C_SR1_SB));
 
+        // 3. Отправляем в канал адрес, для того чтобы происходила запись данных \
+        //    его надо сместить в лево на 1 бит и оставить ноль первым битом
+	    I2C1->DR = (address << 1);
+        while (!(I2C1->SR1 & I2C_SR1_ADDR));
+	    (void) I2C1->SR1;
+	    (void) I2C1->SR2;
+
+	    // 4. Передаем регистр
+	    I2C1->DR = _register;
+	    while (!(I2C1->SR1 & I2C_SR1_TXE));
+
+	    // 5. Передаем данные
+	    I2C1->DR = _data;
+	    while (!(I2C1->SR1 & I2C_SR1_TXE));
+
+	    // 6. Останавливаем передачу
+	    I2C1->CR1 |= I2C_CR1_STOP;
     }
 
     uint8_t _read_reg(uint8_t _address, uint8_t _register) {

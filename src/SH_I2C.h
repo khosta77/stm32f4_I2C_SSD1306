@@ -3,6 +3,8 @@
 
 #include "../system/include/cmsis/stm32f4xx.h"
 
+#include "SH_DMA_Sx.h"
+
 #if 0
 void buffer() {
     // I2C init
@@ -81,6 +83,10 @@ void buffer() {
 
 class SH_I2C {
     I2C_TypeDef *_I2Cx;
+
+    SH_DMA_Sx *_DMA_TX;
+    SH_DMA_Sx *_DMA_RX;
+
     /* 
      * 01234567
      * -+------------------------------------
@@ -115,8 +121,10 @@ class SH_I2C {
 public:
     SH_I2C(I2C_TypeDef *I2Cx,
            const uint8_t &options,
-           const uint8_t &slave_freq
-           ) : _I2Cx(I2Cx), _options(options), _slave_freq(slave_freq) {
+           const uint8_t &slave_freq,
+           SH_DMA_Sx *DMA_TX,
+           SH_DMA_Sx *DMA_RX
+           ) : _I2Cx(I2Cx), _options(options), _slave_freq(slave_freq), _DMA_TX(DMA_TX), _DMA_RX(DMA_RX) {
         
         if (_I2Cx == I2C1)
             RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
@@ -239,6 +247,8 @@ public:
         _register = 0;
         _data = 0;
         // TODO
+
+
     }
 
     uint8_t _read_reg(uint8_t _address, uint8_t _register) {

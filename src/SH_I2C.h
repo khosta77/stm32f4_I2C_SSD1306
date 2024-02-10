@@ -135,7 +135,7 @@ public:
 
         // Найстройка DMA
         if ((_options & 0x80) == 1) {
-            I2C1->CR2 |= (I2C_CR2_LAST | I2C_CR2_DMAEN);
+            _I2Cx->CR2 |= (I2C_CR2_LAST | I2C_CR2_DMAEN);
             
 #if 0
             // Настройка DMA1 на чтение и запись по I2C
@@ -176,15 +176,15 @@ public:
         }
 
         if ((_options & 0x01) == 0x01) {
-            I2C1->CCR |= I2C_CCR_FS;
+            _I2Cx->CCR |= I2C_CCR_FS;
             I2C_mode_speed = 0.0000025f;
             I2C_trice = 0.0000003f;
         }
 
         if ((_options & 0x02) == 0x02)
-            I2C1->CCR |= I2C_CCR_DUTY;
+            _I2Cx->CCR |= I2C_CCR_DUTY;
 
-        I2C1->CR2 |= (_slave_freq & 0x3F);
+        _I2Cx->CR2 |= (_slave_freq & 0x3F);
 
     }
 
@@ -239,81 +239,81 @@ public:
     }
 
     void _enable() {
-        I2C1->CR1 |= I2C_CR1_PE;
+        _I2Cx->CR1 |= I2C_CR1_PE;
     }
 
     void _write_reg(uint8_t _address, uint8_t _register, uint8_t _data) {
         // 0. Ждем не занят ли шина I2C
-	    while (I2C1->SR2 & I2C_SR2_BUSY);
+	    while (_I2Cx->SR2 & I2C_SR2_BUSY);
 
         // 1. Запускаем передачу
-	    I2C1->CR1 |= I2C_CR1_START;
+	    _I2Cx->CR1 |= I2C_CR1_START;
     
         // 2. Ждем пока будет отправлен начальный бит
-	    while (!(I2C1->SR1 & I2C_SR1_SB));
+	    while (!(_I2Cx->SR1 & I2C_SR1_SB));
 
         // 3. Отправляем в канал адрес, для того чтобы происходила запись данных \
         //    его надо сместить в лево на 1 бит и оставить ноль первым битом
-	    I2C1->DR = (address << 1);
-        while (!(I2C1->SR1 & I2C_SR1_ADDR));
-	    (void) I2C1->SR1;
-	    (void) I2C1->SR2;
+	    _I2Cx->DR = (address << 1);
+        while (!(_I2Cx->SR1 & I2C_SR1_ADDR));
+	    (void) _I2Cx->SR1;
+	    (void) _I2Cx->SR2;
 
 	    // 4. Передаем регистр
-	    I2C1->DR = _register;
-	    while (!(I2C1->SR1 & I2C_SR1_TXE));
+	    _I2Cx->DR = _register;
+	    while (!(_I2Cx->SR1 & I2C_SR1_TXE));
 
 	    // 5. Передаем данные
-	    I2C1->DR = _data;
-	    while (!(I2C1->SR1 & I2C_SR1_TXE));
+	    _I2Cx->DR = _data;
+	    while (!(_I2Cx->SR1 & I2C_SR1_TXE));
 
 	    // 6. Останавливаем передачу
-	    I2C1->CR1 |= I2C_CR1_STOP;
+	    _I2Cx->CR1 |= I2C_CR1_STOP;
     }
 
     uint8_t _read_reg(uint8_t _address, uint8_t _register) {
         uint8_t _data = 0x00;
 
         // 0.  Ждем не занят ли шина I2C
-        while (I2C1->SR2 & I2C_SR2_BUSY);
+        while (_I2Cx->SR2 & I2C_SR2_BUSY);
 
         // 1. Запускаем передачу
-	    I2C1->CR1 |= I2C_CR1_START;
+	    _I2Cx->CR1 |= I2C_CR1_START;
 	
         // 2. Ждем пока будет отправлен начальный бит
-	    while (!(I2C1->SR1 & I2C_SR1_SB));
+	    while (!(_I2Cx->SR1 & I2C_SR1_SB));
 	
         // 3. Отправляем в канал адрес, для того чтобы происходила запись данных \
         //    его надо сместить в лево на 1 бит и оставить ноль первым битом
-	    I2C1->DR = (_address << 1);
-        while (!(I2C1->SR1 & I2C_SR1_ADDR));
-        (void) I2C1->SR1;
-        (void) I2C1->SR2;
+	    _I2Cx->DR = (_address << 1);
+        while (!(_I2Cx->SR1 & I2C_SR1_ADDR));
+        (void) _I2Cx->SR1;
+        (void) _I2Cx->SR2;
 
         // 4. Передаем адрес регистра
-	    I2C1->DR = _register;
-	    while(!(I2C1->SR1 & I2C_SR1_TXE)){};
+	    _I2Cx->DR = _register;
+	    while(!(_I2Cx->SR1 & I2C_SR1_TXE)){};
 
         // 5. Останавливаем передачу
-    	I2C1->CR1 |= I2C_CR1_STOP;
+    	_I2Cx->CR1 |= I2C_CR1_STOP;
 
         // 6. Производим рестарт
-	    I2C1->CR1 |= I2C_CR1_START;
-	    while(!(I2C1->SR1 & I2C_SR1_SB)){};
+	    _I2Cx->CR1 |= I2C_CR1_START;
+	    while(!(_I2Cx->SR1 & I2C_SR1_SB)){};
 
 	    // 7. Передаем адрес устройства, но теперь для чтения
-	    I2C1->DR = ((_address << 1) | 0x01);
-	    while(!(I2C1->SR1 & I2C_SR1_ADDR)){};
-	    (void) I2C1->SR1;
-	    (void) I2C1->SR2;
+	    _I2Cx->DR = ((_address << 1) | 0x01);
+	    while(!(_I2Cx->SR1 & I2C_SR1_ADDR)){};
+	    (void) _I2Cx->SR1;
+	    (void) _I2Cx->SR2;
 
 	    // 8. Считываем данные
-	    I2C1->CR1 &= ~I2C_CR1_ACK;
-	    while(!(I2C1->SR1 & I2C_SR1_RXNE)){};
-	    _data = I2C1->DR;
+	    _I2Cx->CR1 &= ~I2C_CR1_ACK;
+	    while(!(_I2Cx->SR1 & I2C_SR1_RXNE)){};
+	    _data = _I2Cx->DR;
 
         // 9. Производим остановку
-    	I2C1->CR1 |= I2C_CR1_STOP;
+    	_I2Cx->CR1 |= I2C_CR1_STOP;
 
 	    return _data;
     }

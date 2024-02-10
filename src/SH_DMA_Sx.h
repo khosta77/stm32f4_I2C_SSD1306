@@ -770,61 +770,6 @@ public:
         _iqr_dma_sx_init(irq_priority);
     }
 
-    inline uint16_t size() const {
-        return _size;
-    }
-#if 1
-static void DMA_Transmit(const uint8_t *pBuffer, uint32_t size) {
-    if((NULL != pBuffer) && (size < 16)) {
-        while (_i2c1_mrk_tx != 0x00) {;}  // Ждем пока предыдущая передача не закончится
-        _i2c1_mrk_tx = 0x01;
-        DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-        while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
-        for (uint8_t i = 0; i < size; ++i) {
-            _i2c1_data_tx[i] = pBuffer[i];
-        }
-
-        DMA1_Stream6->NDTR = size;
-        DMA1->HIFCR = DMA_HIFCR_CTCIF6;
-        DMA1_Stream6->CR |= DMA_SxCR_EN;
-        //while (!(I2C1->SR2 & I2C_SR2_BUSY)){;}
-
-    } else {
-        /* Null pointers, do nothing */
-    }
-}
-
-static void DMA_Receive(const uint8_t size) {
-    if(size < 16) {
-        while (_i2c1_mrk_rx != 0x00) {;}  // Ждем пока предыдущая передача не закончится
-        _i2c1_mrk_rx = 0x01;
-        DMA1_Stream5->CR &= ~DMA_SxCR_EN;
-	    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
-        DMA1_Stream5->NDTR = size;
-        DMA1->HIFCR = DMA_HIFCR_CTCIF5;
-        DMA1_Stream5->CR |= DMA_SxCR_EN;
-    } else {
-        //GPIOD->ODR ^= GPIO_ODR_OD12;
-        /* Null pointers, do nothing */
-    }
-}
-
-static void DMA_Receive_read(uint8_t *pBuffer, uint8_t size) {
-    if((NULL != pBuffer) && (size < 16)) {
-        while (_i2c1_mrk_rx_work == 0x00) {;}  // Ждем пока предыдущая передача не закончится
-        _i2c1_mrk_rx_work = 0x00;
-        DMA1_Stream5->CR &= ~DMA_SxCR_EN;
-	    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
-        for (uint8_t i = 0; i < size; ++i) {
-            *(pBuffer + i) = _i2c1_data_rx[i];
-        }
-    } else {
-        //GPIOD->ODR ^= GPIO_ODR_OD12;
-        /* Null pointers, do nothing */
-    }
-}
-#endif
-
 private:
     void fuller_array(A *_array, const A *pBuffer) {
         for (uint32_t i = 0; i < _size; ++i) {
@@ -837,7 +782,7 @@ public:
         if(pBuffer != nullptr) {
             // Ждем/проверяем пока передача не закончится
             while ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF) {;}
-            
+
             // Отключаем DMA
             _DMA_Sx->CR &= ~DMA_SxCR_EN;
             while ((_DMA_Sx->CR) & DMA_SxCR_EN){;}
@@ -854,45 +799,63 @@ public:
             }
 
             // Выставляем маркер начала передачи.
-            _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_CT;
+            _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_TCIF;
+            _DMA_Sx->NDTR = _size;
+            _DMA_Sx->CR |= DMA_SxCR_MINC;
 
-            while (stftcb_array_tx_status != 0x00) {;}  // Ждем пока предыдущая передача не закончится
-            stftcb_SetAddressWindow(0, count_l, STFTCB_WIDTH, count_l);
-            ++count_l;
-
-            SPI_1byte_mode_on();
-            STFTCB_DC_ON;
-            STFTCB_SPI_DMA_SxCR->CR &= ~DMA_SxCR_EN;
-            while ((STFTCB_SPI_DMA_SxCR->CR) & DMA_SxCR_EN){;}
-
-            if (stftcb_array_tx_mxar == 0) {
-                STFTCB_SPI_DMA_SxCR->CR &= ~DMA_SxCR_CT;
-                stftcb_array_tx_mxar = 0x01;
-            } else {
-                STFTCB_SPI_DMA_SxCR->CR |= DMA_SxCR_CT;
-                stftcb_array_tx_mxar = 0x00;
-            }
-
-            stftcb_array_tx_status = 0x11;
-            STFTCB_SPI_DMA_SxCR->NDTR = STFTCB_ARRAY_SIZE;
-            STFTCB_SPI_DMA_SxCR->CR |= DMA_SxCR_MINC;
-            STFTCB_SPI_DMA_SxCR->CR |= DMA_SxCR_EN;
-
-            while (_i2c1_mrk_tx != 0x00) {;}  // Ждем пока предыдущая передача не закончится
-            _i2c1_mrk_tx = 0x01;
-            DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-            while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
-            for (uint8_t i = 0; i < size; ++i) {
-                _i2c1_data_tx[i] = pBuffer[i];
-            }
-
-            DMA1_Stream6->NDTR = size;
-            DMA1->HIFCR = DMA_HIFCR_CTCIF6;
-            DMA1_Stream6->CR |= DMA_SxCR_EN;
-            //while (!(I2C1->SR2 & I2C_SR2_BUSY)){;}
+            // Запускаем передачу
+            _DMA_Sx->CR |= DMA_SxCR_EN;
         } else {
-            /* Null pointers, do nothing */
+            /* Нулевой массив */
         }
+    }
+
+    void dma_receive() {
+        // Ждем/проверяем пока передача не закончится
+        while ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF) {;}
+
+        // Отключаем DMA
+        _DMA_Sx->CR &= ~DMA_SxCR_EN;
+        while ((_DMA_Sx->CR) & DMA_SxCR_EN){;}
+
+        // Выбираем и заполняем массив
+        if ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_CT) == DMAx_IRQ_STATUS_CT) {
+            _DMA_Sx->CR &= ~DMA_SxCR_CT;
+            _dmax_irq_status[_dma_stream] &= ~DMAx_IRQ_STATUS_CT;
+        } else {
+            _DMA_Sx->CR |= DMA_SxCR_CT;
+            _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_CT;
+        }
+
+        // Выставляем маркер начала передачи.
+        _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_TCIF;
+        _DMA_Sx->NDTR = _size;
+        _DMA_Sx->CR |= DMA_SxCR_MINC;  // Не уверен надо ли это при приеме
+
+        // Запускаем прием
+        _DMA_Sx->CR |= DMA_SxCR_EN;
+    }
+
+    A *dma_receive_read() {
+        // Ждем/проверяем пока передача не закончится
+        while ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF) {;}
+
+        // Отключаем DMA
+        _DMA_Sx->CR &= ~DMA_SxCR_EN;
+        while ((_DMA_Sx->CR) & DMA_SxCR_EN){;}
+
+        // Возвращаем заполненный массив
+        if ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_CT) == DMAx_IRQ_STATUS_CT)
+            return _array_1;
+        else
+            return _array_0;
+
+        // Если происходит что-то изряда вон выходящее, возвращаем ноль.
+        return nullptr;
+    }
+
+    constexpr uint16_t _size_() {
+        return _size;
     }
 };
 

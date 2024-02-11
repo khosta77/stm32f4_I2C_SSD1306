@@ -209,7 +209,7 @@ void DMA1_Stream4_IRQHandler(void) {
     if ((DMA1->HISR & DMA_HISR_TCIF4) == DMA_HISR_TCIF4) {  // Полная передача
         _dmax_irq_status[4] &= ~DMAx_IRQ_STATUS_TCIF;
         DMA1_Stream4->CR &= ~DMA_SxCR_EN;
-        DMA1->HIFCR |= DMA_LIFCR_CTCIF4;
+        DMA1->HIFCR |= DMA_HIFCR_CTCIF4;
     }
 
     if ((DMA1->HISR & DMA_HISR_HTIF4) == DMA_HISR_HTIF4) {  // Половина передачи
@@ -218,7 +218,7 @@ void DMA1_Stream4_IRQHandler(void) {
         DMA1->HIFCR |= DMA_HIFCR_CHTIF4;
     }
 
-    if ((DMA1->HISR & DMA_LISR_TEIF4) == DMA_HISR_TEIF4) {  // Ошибка передачи
+    if ((DMA1->HISR & DMA_HISR_TEIF4) == DMA_HISR_TEIF4) {  // Ошибка передачи
         _dmax_irq_status[4] &= ~DMAx_IRQ_STATUS_TEIF;
         DMA1_Stream4->CR &= ~DMA_SxCR_EN;
         DMA1->HIFCR |= DMA_HIFCR_CTEIF4;
@@ -241,7 +241,7 @@ void DMA1_Stream5_IRQHandler(void) {
     if ((DMA1->HISR & DMA_HISR_TCIF5) == DMA_HISR_TCIF5) {  // Полная передача
         _dmax_irq_status[5] &= ~DMAx_IRQ_STATUS_TCIF;
         DMA1_Stream5->CR &= ~DMA_SxCR_EN;
-        DMA1->HIFCR |= DMA_LIFCR_CTCIF5;
+        DMA1->HIFCR |= DMA_HIFCR_CTCIF5;
     }
 
     if ((DMA1->HISR & DMA_HISR_HTIF5) == DMA_HISR_HTIF5) {  // Половина передачи
@@ -250,7 +250,7 @@ void DMA1_Stream5_IRQHandler(void) {
         DMA1->HIFCR |= DMA_HIFCR_CHTIF5;
     }
 
-    if ((DMA1->HISR & DMA_LISR_TEIF5) == DMA_HISR_TEIF5) {  // Ошибка передачи
+    if ((DMA1->HISR & DMA_HISR_TEIF5) == DMA_HISR_TEIF5) {  // Ошибка передачи
         _dmax_irq_status[5] &= ~DMAx_IRQ_STATUS_TEIF;
         DMA1_Stream5->CR &= ~DMA_SxCR_EN;
         DMA1->HIFCR |= DMA_HIFCR_CTEIF5;
@@ -273,7 +273,7 @@ void DMA1_Stream6_IRQHandler(void) {
     if ((DMA1->HISR & DMA_HISR_TCIF6) == DMA_HISR_TCIF6) {  // Полная передача
         _dmax_irq_status[6] &= ~DMAx_IRQ_STATUS_TCIF;
         DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-        DMA1->HIFCR |= DMA_LIFCR_CTCIF6;
+        DMA1->HIFCR |= DMA_HIFCR_CTCIF6;
     }
 
     if ((DMA1->HISR & DMA_HISR_HTIF6) == DMA_HISR_HTIF6) {  // Половина передачи
@@ -282,7 +282,7 @@ void DMA1_Stream6_IRQHandler(void) {
         DMA1->HIFCR |= DMA_HIFCR_CHTIF4;
     }
 
-    if ((DMA1->HISR & DMA_LISR_TEIF6) == DMA_HISR_TEIF6) {  // Ошибка передачи
+    if ((DMA1->HISR & DMA_HISR_TEIF6) == DMA_HISR_TEIF6) {  // Ошибка передачи
         _dmax_irq_status[6] &= ~DMAx_IRQ_STATUS_TEIF;
         DMA1_Stream6->CR &= ~DMA_SxCR_EN;
         DMA1->HIFCR |= DMA_HIFCR_CTEIF4;
@@ -305,7 +305,7 @@ void DMA1_Stream7_IRQHandler(void) {
     if ((DMA1->HISR & DMA_HISR_TCIF7) == DMA_HISR_TCIF7) {  // Полная передача
         _dmax_irq_status[7] &= ~DMAx_IRQ_STATUS_TCIF;
         DMA1_Stream7->CR &= ~DMA_SxCR_EN;
-        DMA1->HIFCR |= DMA_LIFCR_CTCIF7;
+        DMA1->HIFCR |= DMA_HIFCR_CTCIF7;
     }
 
     if ((DMA1->HISR & DMA_HISR_HTIF7) == DMA_HISR_HTIF7) {  // Половина передачи
@@ -314,7 +314,7 @@ void DMA1_Stream7_IRQHandler(void) {
         DMA1->HIFCR |= DMA_HIFCR_CHTIF7;
     }
 
-    if ((DMA1->HISR & DMA_LISR_TEIF7) == DMA_HISR_TEIF7) {  // Ошибка передачи
+    if ((DMA1->HISR & DMA_HISR_TEIF7) == DMA_HISR_TEIF7) {  // Ошибка передачи
         _dmax_irq_status[7] &= ~DMAx_IRQ_STATUS_TEIF;
         DMA1_Stream7->CR &= ~DMA_SxCR_EN;
         DMA1->HIFCR |= DMA_HIFCR_CTEIF7;
@@ -465,7 +465,7 @@ void DMA2_Stream4_IRQHandler(void) {
     if ((DMA2->HISR & DMA_HISR_TCIF4) == DMA_HISR_TCIF4) {  // Полная передача
         _dmax_irq_status[12] &= ~DMAx_IRQ_STATUS_TCIF;
         DMA2_Stream4->CR &= ~DMA_SxCR_EN;
-        DMA2->HIFCR |= DMA_LIFCR_CTCIF4;
+        DMA2->HIFCR |= DMA_HIFCR_CTCIF4;
     }
 
     if ((DMA2->HISR & DMA_HISR_HTIF4) == DMA_HISR_HTIF4) {  // Половина передачи
@@ -474,7 +474,7 @@ void DMA2_Stream4_IRQHandler(void) {
         DMA2->HIFCR |= DMA_HIFCR_CHTIF4;
     }
 
-    if ((DMA2->HISR & DMA_LISR_TEIF4) == DMA_HISR_TEIF4) {  // Ошибка передачи
+    if ((DMA2->HISR & DMA_HISR_TEIF4) == DMA_HISR_TEIF4) {  // Ошибка передачи
         _dmax_irq_status[12] &= ~DMAx_IRQ_STATUS_TEIF;
         DMA2_Stream4->CR &= ~DMA_SxCR_EN;
         DMA2->HIFCR |= DMA_HIFCR_CTEIF4;
@@ -497,7 +497,7 @@ void DMA2_Stream5_IRQHandler(void) {
     if ((DMA2->HISR & DMA_HISR_TCIF5) == DMA_HISR_TCIF5) {  // Полная передача
         _dmax_irq_status[13] &= ~DMAx_IRQ_STATUS_TCIF;
         DMA2_Stream5->CR &= ~DMA_SxCR_EN;
-        DMA2->HIFCR |= DMA_LIFCR_CTCIF5;
+        DMA2->HIFCR |= DMA_HIFCR_CTCIF5;
     }
 
     if ((DMA2->HISR & DMA_HISR_HTIF5) == DMA_HISR_HTIF5) {  // Половина передачи
@@ -506,7 +506,7 @@ void DMA2_Stream5_IRQHandler(void) {
         DMA2->HIFCR |= DMA_HIFCR_CHTIF5;
     }
 
-    if ((DMA2->HISR & DMA_LISR_TEIF5) == DMA_HISR_TEIF5) {  // Ошибка передачи
+    if ((DMA2->HISR & DMA_HISR_TEIF5) == DMA_HISR_TEIF5) {  // Ошибка передачи
         _dmax_irq_status[13] &= ~DMAx_IRQ_STATUS_TEIF;
         DMA2_Stream5->CR &= ~DMA_SxCR_EN;
         DMA2->HIFCR |= DMA_HIFCR_CTEIF5;
@@ -529,7 +529,7 @@ void DMA2_Stream6_IRQHandler(void) {
     if ((DMA2->HISR & DMA_HISR_TCIF6) == DMA_HISR_TCIF6) {  // Полная передача
         _dmax_irq_status[14] &= ~DMAx_IRQ_STATUS_TCIF;
         DMA2_Stream6->CR &= ~DMA_SxCR_EN;
-        DMA2->HIFCR |= DMA_LIFCR_CTCIF6;
+        DMA2->HIFCR |= DMA_HIFCR_CTCIF6;
     }
 
     if ((DMA2->HISR & DMA_HISR_HTIF6) == DMA_HISR_HTIF6) {  // Половина передачи
@@ -538,7 +538,7 @@ void DMA2_Stream6_IRQHandler(void) {
         DMA2->HIFCR |= DMA_HIFCR_CHTIF4;
     }
 
-    if ((DMA2->HISR & DMA_LISR_TEIF6) == DMA_HISR_TEIF6) {  // Ошибка передачи
+    if ((DMA2->HISR & DMA_HISR_TEIF6) == DMA_HISR_TEIF6) {  // Ошибка передачи
         _dmax_irq_status[14] &= ~DMAx_IRQ_STATUS_TEIF;
         DMA2_Stream6->CR &= ~DMA_SxCR_EN;
         DMA2->HIFCR |= DMA_HIFCR_CTEIF4;
@@ -561,7 +561,7 @@ void DMA2_Stream7_IRQHandler(void) {
     if ((DMA2->HISR & DMA_HISR_TCIF7) == DMA_HISR_TCIF7) {  // Полная передача
         _dmax_irq_status[15] &= ~DMAx_IRQ_STATUS_TCIF;
         DMA2_Stream7->CR &= ~DMA_SxCR_EN;
-        DMA2->HIFCR |= DMA_LIFCR_CTCIF7;
+        DMA2->HIFCR |= DMA_HIFCR_CTCIF7;
     }
 
     if ((DMA2->HISR & DMA_HISR_HTIF7) == DMA_HISR_HTIF7) {  // Половина передачи
@@ -570,7 +570,7 @@ void DMA2_Stream7_IRQHandler(void) {
         DMA2->HIFCR |= DMA_HIFCR_CHTIF7;
     }
 
-    if ((DMA2->HISR & DMA_LISR_TEIF7) == DMA_HISR_TEIF7) {  // Ошибка передачи
+    if ((DMA2->HISR & DMA_HISR_TEIF7) == DMA_HISR_TEIF7) {  // Ошибка передачи
         _dmax_irq_status[15] &= ~DMAx_IRQ_STATUS_TEIF;
         DMA2_Stream7->CR &= ~DMA_SxCR_EN;
         DMA2->HIFCR |= DMA_HIFCR_CTEIF7;
@@ -598,8 +598,6 @@ class SH_DMA_Sx {
     DMA_TypeDef *_DMA;
     P *_periphery;
     uint32_t _options_cr;
-    uint16_t _size;
-    uint8_t _priority;
     uint8_t _dma_stream = 0x00;
 
     void _dmax_init() {
@@ -742,11 +740,9 @@ public:
               const uint32_t &options_cr,
               A *array_0,
               A *array_1,
-              const uint16_t &size,
-              const uint8_t &priority,
               const uint8_t &irq_priority
               ) : _DMA_Sx(DMA_Sx), _periphery(periphery), _options_cr(options_cr),
-                  _array_0(array_0), _array_1(array_1), _size(size), _priority(priority)
+                  _array_0(array_0), _array_1(array_1)
     {
         uint8_t status = 0x00;
 
@@ -762,23 +758,23 @@ public:
 
         // Задаем потоки передачи/приема
         _DMA_Sx->PAR = (uint32_t)&_periphery->DR;
-        _DMA_Sx->M0AR = (uint32_t)&_array_0[0];
-        _DMA_Sx->M1AR = (uint32_t)&_array_1[0];
-        _DMA_Sx->NDTR = _size;
+        _DMA_Sx->M0AR = (uint32_t)&_array_0;
+        _DMA_Sx->M1AR = (uint32_t)&_array_1;
+        //_DMA_Sx->NDTR = _size;
 
         // Инициализируем прирывания
         _iqr_dma_sx_init(irq_priority);
     }
 
 private:
-    void fuller_array(A *_array, const A *pBuffer) {
+    void fuller_array(A *_array, const A *pBuffer, const uint16_t &_size) {
         for (uint32_t i = 0; i < _size; ++i) {
             _array[i] = pBuffer[i];
         }
     }
 
 public:
-    void dma_transmit(const A *pBuffer) {
+    void dma_transmit(const A *pBuffer, const uint16_t &_size) {
         if(pBuffer != nullptr) {
             // Ждем/проверяем пока передача не закончится
             while ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF) {;}
@@ -791,11 +787,11 @@ public:
             if ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_CT) == DMAx_IRQ_STATUS_CT) {
                 _DMA_Sx->CR &= ~DMA_SxCR_CT;
                 _dmax_irq_status[_dma_stream] &= ~DMAx_IRQ_STATUS_CT;
-                fuller_array(_array_0, pBuffer);
+                fuller_array(_array_0, pBuffer, _size);
             } else {
                 _DMA_Sx->CR |= DMA_SxCR_CT;
                 _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_CT;
-                fuller_array(_array_1, pBuffer);
+                fuller_array(_array_1, pBuffer, _size);
             }
 
             // Выставляем маркер начала передачи.
@@ -810,7 +806,7 @@ public:
         }
     }
 
-    void dma_receive() {
+    void dma_receive(const uint16_t &_size) {
         // Ждем/проверяем пока передача не закончится
         while ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF) {;}
 
@@ -830,7 +826,7 @@ public:
         // Выставляем маркер начала передачи.
         _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_TCIF;
         _DMA_Sx->NDTR = _size;
-        _DMA_Sx->CR |= DMA_SxCR_MINC;  // Не уверен надо ли это при приеме
+        //_DMA_Sx->CR |= DMA_SxCR_MINC;  // Не уверен надо ли это при приеме
 
         // Запускаем прием
         _DMA_Sx->CR |= DMA_SxCR_EN;
@@ -854,8 +850,8 @@ public:
         return nullptr;
     }
 
-    constexpr uint16_t _size_() {
-        return _size;
+    inline const uint8_t _is_work() {
+        return ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF);
     }
 };
 

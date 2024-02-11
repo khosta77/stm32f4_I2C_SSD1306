@@ -5,81 +5,27 @@
 
 #include "SH_DMA_Sx.h"
 
-#if 0
-void buffer() {
-    // I2C init
-    RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
-    // 1. Устанавливает тактовую частоту периферийного устройства 50 MHz
-    I2C1->CR2 |= (I2C_CR2_LAST | I2C_CR2_DMAEN | (I2C_CR2_FREQ_5 | I2C_CR2_FREQ_4 | I2C_CR2_FREQ_1));
-    
-    // 2. Задаем частоту работы
-    // Есть два режима стандартная и повышенная:
-    // - Sm, стандартный, скорость 100 кГц = 10  uS = 10 000 nS
-    // - Fs, повышенный, скорость 400 кГц  = 2.5 uS =  2 500 nS
-    // DUTY скважность
-    // Если SM:
-    // t_h = CCR * t_PCLK1
-    // t_l = CCR * t_PCLK1
-    // Если FM:
-    //           DUTY = 0       |        DUTY = 1
-    // t_h = 01 * CCR * t_PCLK1 | t_h = 09 * CCR * t_PCLK1
-    // t_l = 02 * CCR * t_PCLK1 | t_l = 16 * CCR * t_PCLK1
-    // Из этого складывается t_SCL = t_h + t_l
-    // Пример расчета для 400 kHz, когда FM=1,DUTY=0:
-    // CCR * t_PCLK1 + 2 CCR * t_PCLK1 = 2 500 nS
-    // CCR = 2500 nS / (3 * t_PCLK1) => округлить до целого и перевести в hex.
-    // t_PCLK1 = 1 / f_APB1, к APB1 подключены все I2C
-    I2C1->CCR |= (I2C_CCR_FS | 0x00C);
-    
-    // 3. Определим время нарастания фронта, по-моему ни на что не влияет.
-    // Tr = xM
-    // - SM 1000 nS
-    // - FM 300 nS
-    // TRISE = (Tr / t_PCLK1) + 1
-    I2C1->TRISE |= 0x0006;
-    
-    // 4. Включаем переферию
-    I2C1->CR1 |= (I2C_CR1_PE);
+/*
+ * Пример
+SH_GPIO PB6_I2C1_SCL(GPIOB, 6, 0xA3, 0x04);
+SH_GPIO PB9_I2C1_SDA(GPIOB, 9, 0xA3, 0x04);
 
-    // https://hubstub.ru/stm32/184-stm32-i2c.html - помогло
-    
-    // Настройка DMA1 на чтение и запись по I2C
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+uint8_t _dma_i2c1_tx_0[16];
+uint8_t _dma_i2c1_tx_1[16];
 
-    // Отключаем DMA, для чтения
-    DMA1_Stream5->CR &= ~DMA_SxCR_EN;
-    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
-    // Настройка контрольных регистров
-    // - (0x01 << 25)     - настройка DMA канала, для I2C1_RX
-    // - DMA_SxCR_MINC    - Memory INCrement mode
-    // - периферия-память
-    // - DMA_SxCR_TCIE    - Прерывания по завершению передачи
-    DMA1_Stream5->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_TCIE);
+SH_DMA_Sx<I2C_TypeDef, uint8_t> DMA_I2C_TX(DMA1_Stream6, I2C1,
+                                           ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_DIR_0 | DMA_SxCR_TCIE),
+                                           &_dma_i2c1_tx_0[0], &_dma_i2c1_tx_1[0], 2);
 
-    DMA1->HIFCR |= DMA_HIFCR_CTCIF5;  // Включаем прерывание после успешной передачи передачи
-    DMA1_Stream5->PAR = (uint32_t)&I2C1->DR;
-    DMA1_Stream5->M0AR = (uint32_t)&_i2c1_data_rx[0];
-    NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-    NVIC_SetPriority(DMA1_Stream5_IRQn, 2);
+uint8_t _dma_i2c1_rx_0[16];
+uint8_t _dma_i2c1_rx_1[16];
 
-    // Отключаем DMA, для записи
-    DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-    while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
-    // Настройка контрольных регистров
-    // - (0x01 << 25)     - настройка DMA канала, для I2C1_RX
-    // - DMA_SxCR_MINC    - Memory INCrement mode
-    // - DMA_SxCR_DIR_0   - память-перефирия
-    // - DMA_SxCR_TCIE    - Прерывания по завершению передачи
-    DMA1_Stream6->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_DIR_0 | DMA_SxCR_TCIE);
+SH_DMA_Sx<I2C_TypeDef, uint8_t> DMA_I2C_RX(DMA1_Stream5, I2C1,
+                                           ((0x01 << 25) | DMA_SxCR_TCIE),
+                                           &_dma_i2c1_rx_0[0], &_dma_i2c1_rx_1[0], 3);
 
-    DMA1->HIFCR |= DMA_HIFCR_CTCIF6;  // Включаем прерывание после успешной передачи передачи
-    DMA1_Stream6->PAR = (uint32_t)&I2C1->DR;
-    DMA1_Stream6->M0AR = (uint32_t)&_i2c1_data_tx[0];
-    NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-    NVIC_SetPriority(DMA1_Stream6_IRQn, 3);
-}
-#endif
-
+SH_I2C I2C1_FS(I2C1, 0x81, 50, &DMA_I2C_TX, &DMA_I2C_RX);
+*/
 
 class SH_I2C {
     I2C_TypeDef *_I2Cx;
@@ -136,43 +82,6 @@ public:
         // Найстройка DMA
         if ((_options & 0x80) == 0x80) {
             _I2Cx->CR2 |= (I2C_CR2_LAST | I2C_CR2_DMAEN);
-            
-#if 0
-            // Настройка DMA1 на чтение и запись по I2C
-            RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
-
-            // Отключаем DMA, для чтения
-            DMA1_Stream5->CR &= ~DMA_SxCR_EN;
-            while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
-            // Настройка контрольных регистров
-            // - (0x01 << 25)     - настройка DMA канала, для I2C1_RX
-            // - DMA_SxCR_MINC    - Memory INCrement mode
-            // - периферия-память
-            // - DMA_SxCR_TCIE    - Прерывания по завершению передачи
-            DMA1_Stream5->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_TCIE);
-
-            DMA1->HIFCR |= DMA_HIFCR_CTCIF5;  // Включаем прерывание после успешной передачи передачи
-            DMA1_Stream5->PAR = (uint32_t)&I2C1->DR;
-            DMA1_Stream5->M0AR = (uint32_t)&_i2c1_data_rx[0];
-            NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-            NVIC_SetPriority(DMA1_Stream5_IRQn, 2);
-
-            // Отключаем DMA, для записи
-            DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-            while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
-            // Настройка контрольных регистров
-            // - (0x01 << 25)     - настройка DMA канала, для I2C1_RX
-            // - DMA_SxCR_MINC    - Memory INCrement mode
-            // - DMA_SxCR_DIR_0   - память-перефирия
-            // - DMA_SxCR_TCIE    - Прерывания по завершению передачи
-            DMA1_Stream6->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_DIR_0 | DMA_SxCR_TCIE);
-
-            DMA1->HIFCR |= DMA_HIFCR_CTCIF6;  // Включаем прерывание после успешной передачи передачи
-            DMA1_Stream6->PAR = (uint32_t)&I2C1->DR;
-            DMA1_Stream6->M0AR = (uint32_t)&_i2c1_data_tx[0];
-            NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-            NVIC_SetPriority(DMA1_Stream6_IRQn, 3);
-#endif
         }
 
         if ((_options & 0x01) == 0x01) {
@@ -185,7 +94,6 @@ public:
             _I2Cx->CCR |= I2C_CCR_DUTY;
 
         _I2Cx->CR2 |= (_slave_freq & 0x3F);
-
     }
 
 private:
@@ -234,7 +142,29 @@ private:
 public:
     void _ClockInit() {
         t_pclk1_calculated();
+
+        // Есть два режима стандартная и повышенная:
+        // - Sm, стандартный, скорость 100 кГц = 10  uS = 10 000 nS
+        // - Fs, повышенный, скорость 400 кГц  = 2.5 uS =  2 500 nS
+        // DUTY скважность
+        // Если SM:
+        // t_h = CCR * t_PCLK1
+        // t_l = CCR * t_PCLK1
+        // Если FM:
+        //           DUTY = 0       |        DUTY = 1
+        // t_h = 01 * CCR * t_PCLK1 | t_h = 09 * CCR * t_PCLK1
+        // t_l = 02 * CCR * t_PCLK1 | t_l = 16 * CCR * t_PCLK1
+        // Из этого складывается t_SCL = t_h + t_l
+        // Пример расчета для 400 kHz, когда FM=1,DUTY=0:
+        // CCR * t_PCLK1 + 2 CCR * t_PCLK1 = 2 500 nS
+        // CCR = 2500 nS / (3 * t_PCLK1) => округлить до целого и перевести в hex.
+        // t_PCLK1 = 1 / f_APB1, к APB1 подключены все I2C
         _clock_ccr_init();
+        
+        // Tr = xM
+        // - SM 1000 nS
+        // - FM 300 nS
+        // TRISE = (Tr / t_PCLK1) + 1
         _clock_trise_init();
     }
 
@@ -242,7 +172,7 @@ public:
         _I2Cx->CR1 |= I2C_CR1_PE;
     }
 
-    void _write_reg(const uint8_t &_address, const uint8_t &_register, const uint8_t &_data) {
+    void _write_reg(uint8_t _address, const uint8_t &_register, const uint8_t &_data) {
         // 0. Ждем не занят ли шина I2C
 	    while (_I2Cx->SR2 & I2C_SR2_BUSY);
 
@@ -335,10 +265,10 @@ public:
         //    его надо сместить в лево на 1 бит и оставить ноль первым битом
 	    _I2Cx->DR = (_address << 1);
         while (!(_I2Cx->SR1 & I2C_SR1_ADDR));
-
-        _DMA_TX->dma_transmit(_data, _size);
 	    (void) _I2Cx->SR1;
 	    (void) _I2Cx->SR2;
+
+        _DMA_TX->dma_transmit(_data, _size);
 	}
 
     void _dma_read_reg(const uint8_t &_address, const uint8_t &_register, const uint16_t &_size) {
@@ -374,21 +304,18 @@ public:
 	    // 7. Передаем адрес устройства, но теперь для чтения
 	    _I2Cx->DR = ((_address << 1) | 0x01);
 	    while(!(_I2Cx->SR1 & I2C_SR1_ADDR)){};
-        
+        (void) _I2Cx->SR1;
+	    (void) _I2Cx->SR2;
+   
         if (_size < 2) {
             _I2Cx->CR1 &= ~I2C_CR1_ACK;
         } else {
             _I2Cx->CR1 |= I2C_CR1_ACK;
         }
         _DMA_RX->dma_receive(_size);
-	    (void) _I2Cx->SR1;
-	    (void) _I2Cx->SR2;
     }
 
     uint8_t *_dma_read_receive() {
-        while (_DMA_RX->_is_work()) {};
-        _I2Cx->CR1 |= I2C_CR1_STOP;
-
         return _DMA_RX->dma_receive_read();
     }
 };

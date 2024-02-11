@@ -84,8 +84,8 @@ void buffer() {
 class SH_I2C {
     I2C_TypeDef *_I2Cx;
 
-    SH_DMA_Sx *_DMA_TX;
-    SH_DMA_Sx *_DMA_RX;
+    SH_DMA_Sx<I2C_TypeDef, uint8_t> *_DMA_TX;
+    SH_DMA_Sx<I2C_TypeDef, uint8_t> *_DMA_RX;
 
     /* 
      * 01234567
@@ -122,8 +122,8 @@ public:
     SH_I2C(I2C_TypeDef *I2Cx,
            const uint8_t &options,
            const uint8_t &slave_freq,
-           SH_DMA_Sx *DMA_TX,
-           SH_DMA_Sx *DMA_RX
+           SH_DMA_Sx<I2C_TypeDef, uint8_t> *DMA_TX,
+           SH_DMA_Sx<I2C_TypeDef, uint8_t> *DMA_RX
            ) : _I2Cx(I2Cx), _options(options), _slave_freq(slave_freq), _DMA_TX(DMA_TX), _DMA_RX(DMA_RX) {
         
         if (_I2Cx == I2C1)
@@ -134,7 +134,7 @@ public:
             RCC->APB1ENR |= RCC_APB1ENR_I2C3EN;
 
         // Найстройка DMA
-        if ((_options & 0x80) == 1) {
+        if ((_options & 0x80) == 0x80) {
             _I2Cx->CR2 |= (I2C_CR2_LAST | I2C_CR2_DMAEN);
             
 #if 0
@@ -242,7 +242,7 @@ public:
         _I2Cx->CR1 |= I2C_CR1_PE;
     }
 
-    void _write_reg(uint8_t _address, uint8_t _register, uint8_t _data) {
+    void _write_reg(const uint8_t &_address, const uint8_t &_register, const uint8_t &_data) {
         // 0. Ждем не занят ли шина I2C
 	    while (_I2Cx->SR2 & I2C_SR2_BUSY);
 
@@ -254,7 +254,7 @@ public:
 
         // 3. Отправляем в канал адрес, для того чтобы происходила запись данных \
         //    его надо сместить в лево на 1 бит и оставить ноль первым битом
-	    _I2Cx->DR = (address << 1);
+	    _I2Cx->DR = (_address << 1);
         while (!(_I2Cx->SR1 & I2C_SR1_ADDR));
 	    (void) _I2Cx->SR1;
 	    (void) _I2Cx->SR2;
@@ -271,7 +271,7 @@ public:
 	    _I2Cx->CR1 |= I2C_CR1_STOP;
     }
 
-    uint8_t _read_reg(uint8_t _address, uint8_t _register) {
+    uint8_t _read_reg(uint8_t _address, const uint8_t &_register) {
         uint8_t _data = 0x00;
 
         // 0.  Ждем не занят ли шина I2C
@@ -316,6 +316,80 @@ public:
     	_I2Cx->CR1 |= I2C_CR1_STOP;
 
 	    return _data;
+    }
+
+    void _dma_write_reg(const uint8_t &_address, const uint8_t *_data, const uint16_t &_size) {
+        // 0. Проверяем не осуществляется ли сейчас чтение
+        while (_DMA_RX->_is_work()) {};
+
+        // 1. Ждем не занят ли шина I2C
+	    while (_I2Cx->SR2 & I2C_SR2_BUSY);
+
+        // 2. Запускаем передачу
+	    _I2Cx->CR1 |= I2C_CR1_START;
+
+        // 3. Ждем пока будет отправлен начальный бит
+	    while (!(_I2Cx->SR1 & I2C_SR1_SB)){};
+
+        // 4. Отправляем в канал адрес, для того чтобы происходила запись данных \
+        //    его надо сместить в лево на 1 бит и оставить ноль первым битом
+	    _I2Cx->DR = (_address << 1);
+        while (!(_I2Cx->SR1 & I2C_SR1_ADDR));
+
+        _DMA_TX->dma_transmit(_data, _size);
+	    (void) _I2Cx->SR1;
+	    (void) _I2Cx->SR2;
+	}
+
+    void _dma_read_reg(const uint8_t &_address, const uint8_t &_register, const uint16_t &_size) {
+        while (_DMA_TX->_is_work()) {};
+
+        // 0.  Ждем не занят ли шина I2C
+        while (_I2Cx->SR2 & I2C_SR2_BUSY);
+
+        // 1. Запускаем передачу
+	    _I2Cx->CR1 |= I2C_CR1_START;
+
+        // 2. Ждем пока будет отправлен начальный бит
+	    while (!(_I2Cx->SR1 & I2C_SR1_SB));
+
+        // 3. Отправляем в канал адрес, для того чтобы происходила запись данных \
+        //    его надо сместить в лево на 1 бит и оставить ноль первым битом
+	    _I2Cx->DR = (_address << 1);
+        while (!(_I2Cx->SR1 & I2C_SR1_ADDR));
+        (void) _I2Cx->SR1;
+        (void) _I2Cx->SR2;
+
+        // 4. Передаем адрес регистра
+	    _I2Cx->DR = _register;
+	    while(!(_I2Cx->SR1 & I2C_SR1_TXE)){};
+
+        // 5. Останавливаем передачу
+    	_I2Cx->CR1 |= I2C_CR1_STOP;
+
+        // 6. Производим рестарт
+	    _I2Cx->CR1 |= I2C_CR1_START;
+	    while(!(_I2Cx->SR1 & I2C_SR1_SB)){};
+
+	    // 7. Передаем адрес устройства, но теперь для чтения
+	    _I2Cx->DR = ((_address << 1) | 0x01);
+	    while(!(_I2Cx->SR1 & I2C_SR1_ADDR)){};
+        
+        if (_size < 2) {
+            _I2Cx->CR1 &= ~I2C_CR1_ACK;
+        } else {
+            _I2Cx->CR1 |= I2C_CR1_ACK;
+        }
+        _DMA_RX->dma_receive(_size);
+	    (void) _I2Cx->SR1;
+	    (void) _I2Cx->SR2;
+    }
+
+    uint8_t *_dma_read_receive() {
+        while (_DMA_RX->_is_work()) {};
+        _I2Cx->CR1 |= I2C_CR1_STOP;
+
+        return _DMA_RX->dma_receive_read();
     }
 };
 

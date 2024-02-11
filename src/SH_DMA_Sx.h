@@ -3,69 +3,6 @@
 
 #include "../system/include/cmsis/stm32f4xx.h"
 
-#if 0
-void DMA1_Stream6_IRQHandler(void) {  // TX
-    if ((DMA1->HISR & DMA_HISR_TCIF6) == DMA_HISR_TCIF6) {
-        //GPIOD->ODR ^= GPIO_ODR_OD12;
-
-        _i2c1_mrk_tx = 0x00;
-        DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-        //while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
-        DMA1->HIFCR |= DMA_HIFCR_CTCIF6;
-        //GPIOD->ODR ^= GPIO_ODR_OD12;
-
-    }
-}
-
-void DMA1_Stream5_IRQHandler(void) {  // RX
-    if ((DMA1->HISR & DMA_HISR_TCIF5) == DMA_HISR_TCIF5) {
-        _i2c1_mrk_rx = 0x00;
-        _i2c1_mrk_rx_work = 0x01;
-        DMA1_Stream5->CR &= ~DMA_SxCR_EN;
-        //while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
-        DMA1->HIFCR |= DMA_HIFCR_CTCIF5;
-    }
-}
-
-void DMA_init() {
-    // Настройка DMA1 на чтение и запись по I2C
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
-
-    // Отключаем DMA, для чтения
-    DMA1_Stream5->CR &= ~DMA_SxCR_EN;
-    while ((DMA1_Stream5->CR) & DMA_SxCR_EN){;}
-    // Настройка контрольных регистров
-    // - (0x01 << 25)     - настройка DMA канала, для I2C1_RX
-    // - DMA_SxCR_MINC    - Memory INCrement mode
-    // - периферия-память
-    // - DMA_SxCR_TCIE    - Прерывания по завершению передачи
-    DMA1_Stream5->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_TCIE);
-
-    DMA1->HIFCR |= DMA_HIFCR_CTCIF5;  // Включаем прерывание после успешной передачи передачи
-    DMA1_Stream5->PAR = (uint32_t)&I2C1->DR;
-    DMA1_Stream5->M0AR = (uint32_t)&_i2c1_data_rx[0];
-    NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-    NVIC_SetPriority(DMA1_Stream5_IRQn, 2);
-
-    // Отключаем DMA, для записи
-    DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-    while ((DMA1_Stream6->CR) & DMA_SxCR_EN){;}
-    // Настройка контрольных регистров
-    // - (0x01 << 25)     - настройка DMA канала, для I2C1_RX
-    // - DMA_SxCR_MINC    - Memory INCrement mode
-    // - DMA_SxCR_DIR_0   - память-перефирия
-    // - DMA_SxCR_TCIE    - Прерывания по завершению передачи
-    DMA1_Stream6->CR = ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_DIR_0 | DMA_SxCR_TCIE);
-
-    DMA1->HIFCR |= DMA_HIFCR_CTCIF6;  // Включаем прерывание после успешной передачи передачи
-    DMA1_Stream6->PAR = (uint32_t)&I2C1->DR;
-    DMA1_Stream6->M0AR = (uint32_t)&_i2c1_data_tx[0];
-    NVIC_EnableIRQ(DMA1_Stream6_IRQn);
-    NVIC_SetPriority(DMA1_Stream6_IRQn, 3);
-}
-#endif
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
 uint8_t _dmax_irq_status[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
@@ -758,8 +695,8 @@ public:
 
         // Задаем потоки передачи/приема
         _DMA_Sx->PAR = (uint32_t)&_periphery->DR;
-        _DMA_Sx->M0AR = (uint32_t)&_array_0;
-        _DMA_Sx->M1AR = (uint32_t)&_array_1;
+        _DMA_Sx->M0AR = (uint32_t)_array_0;
+        _DMA_Sx->M1AR = (uint32_t)_array_1;
         //_DMA_Sx->NDTR = _size;
 
         // Инициализируем прирывания
@@ -809,6 +746,7 @@ public:
     void dma_receive(const uint16_t &_size) {
         // Ждем/проверяем пока передача не закончится
         while ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF) {;}
+            GPIOD->ODR |= GPIO_ODR_OD14;
 
         // Отключаем DMA
         _DMA_Sx->CR &= ~DMA_SxCR_EN;
@@ -826,7 +764,7 @@ public:
         // Выставляем маркер начала передачи.
         _dmax_irq_status[_dma_stream] |= DMAx_IRQ_STATUS_TCIF;
         _DMA_Sx->NDTR = _size;
-        //_DMA_Sx->CR |= DMA_SxCR_MINC;  // Не уверен надо ли это при приеме
+        _DMA_Sx->CR |= DMA_SxCR_MINC;  // Не уверен надо ли это при приеме
 
         // Запускаем прием
         _DMA_Sx->CR |= DMA_SxCR_EN;
@@ -852,6 +790,17 @@ public:
 
     inline const uint8_t _is_work() {
         return ((_dmax_irq_status[_dma_stream] & DMAx_IRQ_STATUS_TCIF) == DMAx_IRQ_STATUS_TCIF);
+    }
+
+    /* Черт возможно что то пошло не так и из програмы мы это понимаем, надо руками выключить все.
+     * */
+    void _not_plan_stop() {
+        // Отключаем передачу
+        _dmax_irq_status[_dma_stream] &= ~DMAx_IRQ_STATUS_TCIF;
+        
+        // Отключаем DMA
+        _DMA_Sx->CR &= ~DMA_SxCR_EN;
+        while ((_DMA_Sx->CR) & DMA_SxCR_EN){;}
     }
 };
 

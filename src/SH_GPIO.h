@@ -3,15 +3,6 @@
 
 #include "../system/include/cmsis/stm32f4xx.h"
 
-/*
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-    GPIOB->MODER |= (GPIO_MODER_MODER6_1 | GPIO_MODER_MODER9_1);
-    GPIOB->OTYPER |= (GPIO_OTYPER_OT_9 | GPIO_OTYPER_OT_6);
-    GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR9_0 | GPIO_PUPDR_PUPDR6_0);
-    GPIOB->AFR[0] |= GPIO_AFRL_AFSEL6_2;
-    GPIOB->AFR[1] |= GPIO_AFRH_AFSEL9_2;
-*/
-
 class SH_GPIO {
     GPIO_TypeDef *_GPIOx;
     const uint8_t _pin_n;

@@ -301,11 +301,28 @@ uint8_t I2C1_Read(const uint8_t _reg_addr) {
 #endif
 
 SH_GPIO PD12_LED_GREEN(GPIOD, 12, 0x40);
+SH_GPIO PD13_LED(GPIOD, 12, 0x40);
+SH_GPIO PD14_LED(GPIOD, 12, 0x40);
+SH_GPIO PD15_LED(GPIOD, 12, 0x40);
 
 SH_GPIO PB6_I2C1_SCL(GPIOB, 6, 0xA3, 0x04);
 SH_GPIO PB9_I2C1_SDA(GPIOB, 9, 0xA3, 0x04);
 
-SH_I2C I2C1_FS(I2C1, 0x01, 50);
+uint8_t _dma_i2c1_tx_0[16];
+uint8_t _dma_i2c1_tx_1[16];
+
+SH_DMA_Sx<I2C_TypeDef, uint8_t> DMA_I2C_TX(DMA1_Stream6, I2C1,
+                                           ((0x01 << 25) | DMA_SxCR_MINC | DMA_SxCR_DIR_0 | DMA_SxCR_TCIE),
+                                           &_dma_i2c1_tx_0[0], &_dma_i2c1_tx_1[0], 2);
+
+uint8_t _dma_i2c1_rx_0[16];
+uint8_t _dma_i2c1_rx_1[16];
+
+SH_DMA_Sx<I2C_TypeDef, uint8_t> DMA_I2C_RX(DMA1_Stream5, I2C1,
+                                           ((0x01 << 25) | DMA_SxCR_TCIE),
+                                           &_dma_i2c1_rx_0[0], &_dma_i2c1_rx_1[0], 3);
+
+SH_I2C I2C1_FS(I2C1, 0x81, 50, &DMA_I2C_TX, &DMA_I2C_RX);
 
 void I2C1_init() {
     I2C1_FS._ClockInit();
@@ -321,8 +338,10 @@ void GPIOD_init() {
 int main(void) {
     I2C1_init();
     GPIOD_init();
-    uint8_t id = 0;
+    uint8_t *id = nullptr;
     while (1) {
-        id = I2C1_FS._read_reg(BME280_ADDRESS, BME280_ID);
+        I2C1_FS._dma_read_reg(BME280_ADDRESS, BME280_ID, 1);
+        //PD12_LED_GREEN._OFF();
+        id = I2C1_FS._dma_read_receive();
     }
 }
